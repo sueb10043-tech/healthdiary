@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>밥과 몸</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #E7EBE3; color: #20302B; font-family: 'Work Sans', sans-serif; }
+  button { font-family: inherit; cursor: pointer; }
+  textarea:focus, input:focus, button:focus-visible { outline: 2px solid #7E8F3F; outline-offset: 2px; }
+  #wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: #6B7A70; }
+
+  .error-box { background: #F4E6E2; border: 1px solid #D9B8AE; color: #8C4A3C; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 20px; }
+
+  .cal-card { background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 14px; padding: 18px; margin-top: 22px; }
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cal-nav button { background: transparent; border: none; padding: 6px 10px; color: #5B6B63; font-size: 18px; border-radius: 6px; }
+  .cal-nav button:hover { background: #EEF1E4; }
+  .cal-title { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .cal-weekday { text-align: center; font-size: 11.5px; color: #8A9689; font-family: 'IBM Plex Mono', monospace; padding: 2px 0 6px; }
+  .cal-weekday.sun { color: #C0392B; }
+  .cal-weekday.sat { color: #2E5E8C; }
+
+  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 9px; border: 1px solid #E1E6DC; background-color: #F6F7F2; background-size: cover; background-position: center; padding: 0; overflow: hidden; display: flex; align-items: flex-start; justify-content: flex-end; }
+  .cal-cell.today { border: 1.5px solid #7E8F3F; }
+  .cal-cell.has-photo::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(20,28,20,0.55) 100%); }
+  .cal-cell .day-num { position: relative; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; padding: 3px 5px; color: #3A463F; }
+  .cal-cell.sun .day-num { color: #C0392B; }
+  .cal-cell.sat .day-num { color: #2E5E8C; }
+  .cal-cell.today .day-num { color: #4C5C2F; font-weight: 600; }
+  .cal-cell.has-photo .day-num { color: #fff; }
+  .cal-cell .bottom-row { position: absolute; bottom: 4px; left: 4px; right: 4px; display: flex; align-items: center; gap: 4px; }
+  .cal-cell .cond-emoji { font-size: 10px; line-height: 1; flex-shrink: 0; }
+  .cal-cell .stat-txt { font-size: 9px; font-family: 'IBM Plex Mono', monospace; font-weight: 500; line-height: 1; color: #5B6B63; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cal-cell.has-photo .stat-txt { color: #fff; }
+
+  .legend { display: flex; gap: 14px; margin-top: 12px; font-size: 11.5px; color: #8A9689; align-items: center; flex-wrap: wrap; }
+  .legend .legend-emoji { font-size: 12px; margin-right: 4px; }
+  .legend .item { display: flex; align-items: center; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(20,28,20,0.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .modal { background: #FDFCF8; border-radius: 16px; padding: 22px; width: 100%; max-width: 440px; max-height: 88vh; overflow-y: auto; animation: popIn 0.16s ease-out; }
+  @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .modal-head .yr { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #6B7A70; }
+  .modal-head .date-title { font-family: 'Fraunces', serif; font-size: 21px; font-weight: 600; }
+  .close-btn { background: #F0F2EB; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #5B6B63; font-size: 15px; }
+
+  .photo-cal-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: stretch; }
+  .photo-slot { flex: 1; position: relative; min-width: 0; }
+  .photo-placeholder { width: 100%; height: 100%; min-height: 88px; border: 1.5px dashed #B7C2AF; border-radius: 10px; background: #F3F5EE; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #5B6B63; }
+  .photo-placeholder .icon { font-size: 17px; }
+  .photo-placeholder .txt { font-size: 11px; }
+  .photo-preview-wrap { position: relative; height: 100%; min-height: 88px; }
+  .photo-preview-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; border: 1px solid #D7DED2; cursor: zoom-in; }
+  .photo-btn { position: absolute; background: rgba(32,48,43,0.72); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10.5px; }
+  .photo-btn.remove { top: 5px; right: 5px; }
+  .photo-btn.swap { bottom: 5px; right: 5px; width: auto; border-radius: 6px; padding: 3px 7px; font-size: 9.5px; }
+
+  .stat-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .stat-box { flex: 1; border: 1px solid #D7DED2; border-radius: 10px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 6px; }
+  .stat-box .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8A9689; }
+  .stat-box input { width: 100%; border: none; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 600; color: #20302B; background: transparent; }
+
+  .field-label { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #5B6B63; margin-bottom: 8px; display: block; }
+
+  .cond-row { display: flex; gap: 6px; margin-bottom: 18px; }
+  .cond-btn { flex: 1; padding: 8px 2px; border-radius: 8px; border: 1px solid #D7DED2; background: #fff; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cond-btn .cond-btn-emoji { font-size: 18px; line-height: 1; }
+  .cond-btn .lbl { font-size: 11px; color: #20302B; text-align: center; line-height: 1.2; }
+  .cond-btn.active .lbl { font-weight: 600; }
+
+  .note-box { margin-bottom: 18px; }
+  .note-box textarea { width: 100%; border: 1px solid #D7DED2; border-radius: 8px; padding: 9px 10px; font-size: 13.5px; font-family: inherit; resize: vertical; }
+
+  .action-row { display: flex; gap: 8px; }
+  .del-btn { background: #F4E6E2; color: #8C4A3C; border: none; border-radius: 9px; padding: 0 16px; display: flex; align-items: center; gap: 6px; font-size: 13.5px; }
+  .save-btn { flex: 1; background: #7E8F3F; color: #fff; border: none; border-radius: 9px; padding: 11px 0; font-size: 14.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .save-btn[disabled] { background: #8FA070; cursor: default; }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #20302B; color: #fff; padding: 9px 18px; border-radius: 20px; font-size: 13px; z-index: 60; }
+
+  .lightbox-overlay { position: fixed; inset: 0; background: rgba(10,14,10,0.88); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 100; }
+  .lightbox-overlay img { max-width: 100%; max-height: 100%; border-radius: 8px; display: block; }
+  .lightbox-close { position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.15); border: none; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; }
+
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .empty-note { color: #6B7A70; font-size: 13.5px; padding: 24px 0; display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="eyebrow">DAILY LOG</div>
+
+    <div id="errorBox"></div>
+
+    <div class="cal-card">
+      <div class="cal-nav">
+        <button id="prevMonthBtn" aria-label="이전 달">‹</button>
+        <div class="cal-title" id="calTitle"></div>
+        <button id="nextMonthBtn" aria-label="다음 달">›</button>
+      </div>
+      <div class="cal-grid" id="weekdayRow"></div>
+      <div class="cal-grid" id="calGrid" style="margin-top:5px;"></div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="lightboxRoot"></div>
+  <div id="toastRoot"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var CONDITION_LEVELS = [
+    { value: "success2", label: "성공!", emoji: "\uD83D\uDC99" },
+    { value: "success", label: "성공", emoji: "\uD83D\uDC9A" },
+    { value: "uncomfortable", label: "불편", emoji: "\uD83D\uDE30" },
+    { value: "allergy", label: "알러지", emoji: "\uD83E\uDD22" }
+  ];
+  var WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  // Paste the Web App URL you get after deploying the Apps Script (Code.gs)
+  // as a Web App. Looks like: https://script.google.com/macros/s/AKfycb.../exec
+  var GAS_URL = "https://script.google.com/macros/s/AKfycby59a7FI0_Te-tuvEcUtpNUCt9j5G2i96ZW8AcJME3eA6ztoQpWFaraKw9h8FD8lqt4/exec";
+
+  var state = {
+    entries: {},
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+    modalDate: null
+  };
+
+  // Holds the in-progress edit for whichever date is open in the modal,
+  // so typing doesn't force a full re-render (which would lose focus).
+  // photoIsNew: a fresh photo was picked/pasted and needs uploading on save.
+  // removePhoto: the existing remote photo should be deleted on save.
+  var draft = { photo: null, condition: [], photoFileId: "", photoIsNew: false, removePhoto: false };
+  var pasteHandler = null;
+
+  // Older entries stored a single condition value; normalize to an array
+  // so both old and new (multi-select) entries render the same way.
+  function toConditionArray(c) {
+    if (!c) return [];
+    return Array.isArray(c) ? c : [c];
+  }
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function isoOf(y, m, d) { return y + "-" + pad2(m + 1) + "-" + pad2(d); }
+  function todayStr() {
+    var d = new Date();
+    return isoOf(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function formatDateLong(iso) {
+    var d = new Date(iso + "T00:00:00");
+    return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + WEEKDAYS[d.getDay()] + ")";
+  }
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
+
+  // ---- storage (Google Sheets via Apps Script Web App) -------------------
+  // text/plain avoids a CORS preflight (Apps Script doesn't handle OPTIONS),
+  // and doPost/doGet on the Apps Script side JSON.parse the body regardless.
+  function gasFetch(params, body) {
+    var url = GAS_URL + (params ? "?" + params : "");
+    var opts = body
+      ? { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) }
+      : { method: "GET" };
+    return fetch(url, opts).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    });
+  }
+
+  function loadAllEntries() {
+    if (!GAS_URL || GAS_URL.indexOf("PASTE_YOUR") === 0) {
+      document.getElementById("errorBox").innerHTML =
+        '<div class="error-box">Google Sheets 연결 주소(GAS_URL)가 아직 설정되지 않았어요. 코드 상단의 GAS_URL 값을 배포한 웹앱 주소로 바꿔주세요.</div>';
+      return Promise.resolve({});
+    }
+    return gasFetch("action=list").then(function (res) {
+      if (!res || !res.ok) throw new Error((res && res.error) || "list failed");
+      return res.entries || {};
+    }).catch(function (err) {
+      document.getElementById("errorBox").innerHTML =
+        '<div class="error-box">기록을 불러오지 못했어요. 인터넷 연결과 Google Sheets 연결 주소를 확인해주세요.</div>';
+      return {};
+    });
+  }
+
+  function saveEntryToSheet(dateIso, payload) {
+    payload.action = "save";
+    payload.date = dateIso;
+    return gasFetch(null, payload).then(function (res) {
+      if (!res || !res.ok) throw new Error((res && res.error) || "save failed");
+      return res;
+    });
+  }
+
+  function deleteEntryFromSheet(dateIso) {
+    return gasFetch(null, { action: "delete", date: dateIso }).then(function (res) {
+      if (!res || !res.ok) throw new Error((res && res.error) || "delete failed");
+      return res;
+    });
+  }
+
+  // ---- image compression --------------------------------------------
+  function fileToCompressedDataUrl(file, maxSize, quality) {
+    maxSize = maxSize || 720;
+    quality = quality || 0.6;
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("read failed")); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error("image load failed")); };
+        img.onload = function () {
+          var width = img.width, height = img.height;
+          if (width > height && width > maxSize) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+          var canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showToast(msg) {
+    var root = document.getElementById("toastRoot");
+    root.innerHTML = '<div class="toast">' + escapeHtml(msg) + "</div>";
+    setTimeout(function () { root.innerHTML = ""; }, 2200);
+  }
+
+  // ---- calorie auto-read (OCR) ------------------------------------------
+  // Looks for the "총 섭취 / 목표" line, e.g. "1,452 / 1,820kcal", and pulls
+  // out the first (consumed) number. Runs on the original, uncompressed
+  // photo so small digits stay legible.
+  function extractCaloriesFromOcrText(text) {
+    if (!text) return null;
+    var m = text.match(/([0-9][0-9,\.]{1,7})\s*\/\s*[0-9][0-9,\.]{1,7}\s*k?cal/i);
+    if (!m) return null;
+    var num = parseInt(m[1].replace(/[,\.]/g, ""), 10);
+    if (isNaN(num)) return null;
+    return String(num);
+  }
+  function setCaloriesOcrState(loading) {
+    var label = document.getElementById("caloriesLabel");
+    if (label) label.textContent = loading ? "총 칼로리 (인식 중…)" : "총 칼로리";
+  }
+  function runCalorieOcr(file) {
+    if (typeof Tesseract === "undefined") return; // OCR script didn't load (e.g. offline) — skip quietly
+    setCaloriesOcrState(true);
+    Tesseract.recognize(file, "eng")
+      .then(function (result) {
+        var kcal = extractCaloriesFromOcrText(result && result.data && result.data.text);
+        var input = document.getElementById("caloriesInput");
+        if (kcal && input) {
+          input.value = kcal;
+          showToast("총 칼로리 " + kcal + "kcal 자동 입력 — 다르면 눌러서 수정하세요");
+        } else {
+          showToast("칼로리를 자동으로 인식하지 못했어요. 직접 입력해주세요");
+        }
+      })
+      .catch(function () {
+        showToast("칼로리 자동 인식에 실패했어요");
+      })
+      .finally(function () {
+        setCaloriesOcrState(false);
+      });
+  }
+
+  function openLightbox(src) {
+    document.getElementById("lightboxRoot").innerHTML =
+      '<div class="lightbox-overlay" id="lightboxOverlay">' +
+        '<img src="' + src + '" alt="식단 사진 크게 보기" />' +
+        '<button class="lightbox-close" id="lightboxCloseBtn">✕</button>' +
+      '</div>';
+    document.getElementById("lightboxOverlay").addEventListener("click", function (e) {
+      if (e.target.id === "lightboxOverlay" || e.target.id === "lightboxCloseBtn") closeLightbox();
+    });
+  }
+  function closeLightbox() {
+    document.getElementById("lightboxRoot").innerHTML = "";
+  }
+  function bindPhotoImgClick() {
+    var img = document.getElementById("photoImg");
+    if (img) img.addEventListener("click", function () { openLightbox(img.getAttribute("src")); });
+  }
+
+  // ---- calendar rendering ---------------------------------------------
+  function buildMonthMatrix(year, month) {
+    var firstDay = new Date(year, month, 1);
+    var startWeekday = firstDay.getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var cells = [];
+    for (var i = 0; i < startWeekday; i++) cells.push(null);
+    for (var d = 1; d <= daysInMonth; d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }
+
+  function conditionEmoji(value) {
+    for (var i = 0; i < CONDITION_LEVELS.length; i++) {
+      if (CONDITION_LEVELS[i].value === value) return CONDITION_LEVELS[i].emoji;
+    }
+    return null;
+  }
+
+  function renderWeekdayRow() {
+    var html = "";
+    WEEKDAYS.forEach(function (w, i) {
+      var cls = i === 0 ? "sun" : i === 6 ? "sat" : "";
+      html += '<div class="cal-weekday ' + cls + '">' + w + "</div>";
+    });
+    document.getElementById("weekdayRow").innerHTML = html;
+  }
+
+  function renderCalendar() {
+    document.getElementById("calTitle").textContent = state.viewYear + "년 " + (state.viewMonth + 1) + "월";
+    var cells = buildMonthMatrix(state.viewYear, state.viewMonth);
+    var today = todayStr();
+    var html = "";
+    cells.forEach(function (day, idx) {
+      if (day === null) { html += "<div></div>"; return; }
+      var iso = isoOf(state.viewYear, state.viewMonth, day);
+      var entry = state.entries[iso];
+      var weekdayIdx = idx % 7;
+      var classes = ["cal-cell"];
+      if (iso === today) classes.push("today");
+      if (entry && entry.photo) classes.push("has-photo");
+      if (weekdayIdx === 0) classes.push("sun");
+      if (weekdayIdx === 6) classes.push("sat");
+      var bg = entry && entry.photo ? ' style="background-image:url(' + entry.photo + ')"' : "";
+      var condEmojis = toConditionArray(entry && entry.condition).map(conditionEmoji).filter(Boolean);
+      var statParts = [];
+      if (entry && entry.weight) statParts.push(entry.weight);
+      if (entry && entry.calories) statParts.push(entry.calories);
+      var bottomRow = "";
+      if (condEmojis.length || statParts.length) {
+        bottomRow = '<span class="bottom-row">';
+        if (condEmojis.length) bottomRow += '<span class="cond-emoji">' + condEmojis.join("") + '</span>';
+        if (statParts.length) bottomRow += '<span class="stat-txt">' + escapeHtml(statParts.join(" · ")) + "</span>";
+        bottomRow += "</span>";
+      }
+      html += '<button class="' + classes.join(" ") + '"' + bg + ' data-date="' + iso + '">' +
+        '<span class="day-num">' + day + "</span>" +
+        bottomRow +
+        "</button>";
+    });
+    document.getElementById("calGrid").innerHTML = html;
+
+    Array.prototype.forEach.call(document.querySelectorAll("#calGrid .cal-cell"), function (btn) {
+      btn.addEventListener("click", function () { openModal(btn.getAttribute("data-date")); });
+    });
+  }
+
+  function renderLegend() {
+    var html = "<span>컨디션</span>";
+    CONDITION_LEVELS.forEach(function (lvl) {
+      html += '<span class="item"><span class="legend-emoji">' + lvl.emoji + '</span>' + lvl.label + "</span>";
+    });
+    document.getElementById("legend").innerHTML = html;
+  }
+
+  // ---- modal ------------------------------------------------------------
+  function openModal(iso) {
+    state.modalDate = iso;
+    var existing = state.entries[iso] || {};
+    draft.photo = existing.photo || null;
+    draft.photoFileId = existing.photoFileId || "";
+    draft.photoIsNew = false;
+    draft.removePhoto = false;
+    draft.condition = toConditionArray(existing.condition);
+
+    var condButtons = CONDITION_LEVELS.map(function (lvl) {
+      var active = draft.condition.indexOf(lvl.value) !== -1;
+      return '<button type="button" class="cond-btn' + (active ? " active" : "") + '" data-cond="' + lvl.value + '" ' +
+        'style="' + (active ? "border:1.5px solid #7E8F3F;background:#EEF1E4;" : "") + '">' +
+        '<span class="cond-btn-emoji">' + lvl.emoji + '</span>' +
+        '<span class="lbl">' + lvl.label + "</span></button>";
+    }).join("");
+
+    var photoBlock = draft.photo
+      ? '<div class="photo-preview-wrap"><img id="photoImg" src="' + draft.photo + '" alt="식단 사진" />' +
+        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button>' +
+        '<button type="button" class="photo-btn swap" id="swapPhotoBtn">사진 바꾸기</button></div>'
+      : '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
+        '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
+        '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+
+    var hasExisting = !!state.entries[iso];
+
+    if (pasteHandler) { window.removeEventListener("paste", pasteHandler); pasteHandler = null; }
+    document.getElementById("lightboxRoot").innerHTML = "";
+
+    var html =
+      '<div class="overlay" id="overlay">' +
+        '<div class="modal" id="modalBox">' +
+          '<div class="modal-head">' +
+            '<div><div class="yr">' + state.viewYear + '</div><div class="date-title">' + formatDateLong(iso) + '</div></div>' +
+            '<button class="close-btn" id="closeModalBtn">✕</button>' +
+          '</div>' +
+
+          '<div class="photo-cal-row">' +
+            '<div class="photo-slot" id="photoSlot">' + photoBlock + '</div>' +
+            '<div class="stat-col">' +
+              '<div class="stat-box"><span class="stat-label" id="caloriesLabel">총 칼로리</span>' +
+                '<input type="number" inputmode="numeric" id="caloriesInput" placeholder="0" value="' +
+                  escapeHtml(existing.calories || "") + '" /></div>' +
+              '<div class="stat-box"><span class="stat-label">체중 (kg)</span>' +
+                '<input type="number" inputmode="decimal" step="0.1" id="weightInput" placeholder="58.4" value="' +
+                  escapeHtml(existing.weight || "") + '" /></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<input type="file" accept="image/*" id="photoFileInput" style="display:none" />' +
+
+          '<div style="margin-bottom:18px;">' +
+            '<span class="field-label">오늘 컨디션</span>' +
+            '<div class="cond-row" id="condRow">' + condButtons + '</div>' +
+          '</div>' +
+
+          '<div class="note-box">' +
+            '<span class="field-label">메모</span>' +
+            '<textarea id="noteInput" rows="3" placeholder="컨디션, 소화, 수면 등">' + escapeHtml(existing.note || "") + '</textarea>' +
+          '</div>' +
+
+          '<div class="action-row">' +
+            (hasExisting ? '<button class="del-btn" id="deleteBtn">🗑 삭제</button>' : "") +
+            '<button class="save-btn" id="saveBtn">✓ 저장</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById("modalRoot").innerHTML = html;
+    bindModalEvents(iso);
+    bindPhotoImgClick();
+  }
+
+  function closeModal() {
+    state.modalDate = null;
+    document.getElementById("modalRoot").innerHTML = "";
+    if (pasteHandler) {
+      window.removeEventListener("paste", pasteHandler);
+      pasteHandler = null;
+    }
+  }
+
+  function bindModalEvents(iso) {
+    document.getElementById("overlay").addEventListener("click", function (e) {
+      if (e.target.id === "overlay") closeModal();
+    });
+    document.getElementById("closeModalBtn").addEventListener("click", closeModal);
+
+    // Condition buttons: toggle without a full re-render. Multi-select.
+    Array.prototype.forEach.call(document.querySelectorAll("#condRow .cond-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var val = btn.getAttribute("data-cond");
+        var idx = draft.condition.indexOf(val);
+        if (idx === -1) draft.condition.push(val); else draft.condition.splice(idx, 1);
+        Array.prototype.forEach.call(document.querySelectorAll("#condRow .cond-btn"), function (b) {
+          var lvl = CONDITION_LEVELS.filter(function (l) { return l.value === b.getAttribute("data-cond"); })[0];
+          var isActive = draft.condition.indexOf(lvl.value) !== -1;
+          b.classList.toggle("active", isActive);
+          b.style.border = isActive ? "1.5px solid #7E8F3F" : "";
+          b.style.background = isActive ? "#EEF1E4" : "";
+        });
+      });
+    });
+
+    function bindPhotoInputTrigger(elId) {
+      var el = document.getElementById(elId);
+      if (el) el.addEventListener("click", function () { document.getElementById("photoFileInput").click(); });
+    }
+    bindPhotoInputTrigger("photoPlaceholderBtn");
+    bindPhotoInputTrigger("swapPhotoBtn");
+
+    var removeBtn = document.getElementById("removePhotoBtn");
+    if (removeBtn) removeBtn.addEventListener("click", function () {
+      draft.photo = null;
+      draft.photoIsNew = false;
+      if (draft.photoFileId) draft.removePhoto = true;
+      document.getElementById("photoSlot").innerHTML =
+        '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
+        '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
+        '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+      bindPhotoInputTrigger("photoPlaceholderBtn");
+    });
+
+    function applyPhotoToSlot(dataUrl) {
+      draft.photo = dataUrl;
+      draft.photoIsNew = true;
+      draft.removePhoto = false;
+      var slot = document.getElementById("photoSlot");
+      slot.innerHTML =
+        '<div class="photo-preview-wrap"><img id="photoImg" src="' + dataUrl + '" alt="식단 사진" />' +
+        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button>' +
+        '<button type="button" class="photo-btn swap" id="swapPhotoBtn">사진 바꾸기</button></div>';
+      bindPhotoImgClick();
+      document.getElementById("removePhotoBtn").addEventListener("click", function () {
+        draft.photo = null;
+        draft.photoIsNew = false;
+        if (draft.photoFileId) draft.removePhoto = true;
+        slot.innerHTML = '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
+          '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
+          '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+        bindPhotoInputTrigger("photoPlaceholderBtn");
+      });
+      bindPhotoInputTrigger("swapPhotoBtn");
+    }
+
+    function handleIncomingImageFile(file) {
+      if (!file) return;
+      var slot = document.getElementById("photoSlot");
+      slot.innerHTML = '<div class="photo-placeholder"><span class="spin">⟳</span><span class="txt">사진 처리 중…</span></div>';
+      fileToCompressedDataUrl(file).then(function (dataUrl) {
+        applyPhotoToSlot(dataUrl);
+      }).catch(function () {
+        showToast("사진 처리에 실패했어요");
+        slot.innerHTML = '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
+          '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
+          '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+        bindPhotoInputTrigger("photoPlaceholderBtn");
+      });
+      runCalorieOcr(file);
+    }
+
+    document.getElementById("photoFileInput").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      handleIncomingImageFile(file);
+    });
+
+    // Allow pasting a copied image (Ctrl+V) straight into the photo slot
+    // while this popup is open.
+    pasteHandler = function (e) {
+      var items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf("image/") === 0) {
+          var file = items[i].getAsFile();
+          if (file) handleIncomingImageFile(file);
+          break;
+        }
+      }
+    };
+    window.addEventListener("paste", pasteHandler);
+
+    var deleteBtn = document.getElementById("deleteBtn");
+    if (deleteBtn) deleteBtn.addEventListener("click", function () {
+      deleteBtn.disabled = true;
+      deleteBtn.innerHTML = '<span class="spin">⟳</span> 삭제 중…';
+      deleteEntryFromSheet(iso).then(function () {
+        delete state.entries[iso];
+        showToast("삭제했어요");
+        closeModal();
+        renderCalendar();
+      }).catch(function () {
+        showToast("삭제에 실패했어요. 인터넷 연결을 확인해주세요");
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = "🗑 삭제";
+      });
+    });
+
+    document.getElementById("saveBtn").addEventListener("click", function () {
+      var weight = document.getElementById("weightInput").value.trim();
+      var calories = document.getElementById("caloriesInput").value.trim();
+      var note = document.getElementById("noteInput").value.trim();
+
+      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note) {
+        showToast("사진이나 컨디션 중 하나는 기록해 주세요");
+        return;
+      }
+
+      var saveBtn = document.getElementById("saveBtn");
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="spin">⟳</span> 저장 중…';
+
+      var payload = {
+        weight: weight,
+        calories: calories,
+        condition: draft.condition,
+        note: note,
+        existingPhotoFileId: draft.photoFileId || ""
+      };
+      if (draft.photoIsNew && draft.photo) payload.photoBase64 = draft.photo;
+      if (draft.removePhoto) payload.removePhoto = true;
+
+      saveEntryToSheet(iso, payload).then(function (res) {
+        state.entries[iso] = {
+          weight: weight,
+          calories: calories,
+          condition: draft.condition,
+          note: note,
+          photo: draft.removePhoto ? "" : (payload.photoBase64 ? draft.photo : (state.entries[iso] && state.entries[iso].photo) || ""),
+          photoFileId: (res && res.photoFileId) || ""
+        };
+        showToast("저장했어요");
+        closeModal();
+        renderCalendar();
+        // Refresh from the sheet in the background so the calendar shows the
+        // permanent Drive photo URL instead of the local base64 preview.
+        loadAllEntries().then(function (entries) { state.entries = entries; renderCalendar(); });
+      }).catch(function () {
+        showToast("저장에 실패했어요. 인터넷 연결과 Google Sheets 연결 주소를 확인해주세요");
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = "✓ 저장";
+      });
+    });
+  }
+
+  // ---- month navigation --------------------------------------------------
+  document.getElementById("prevMonthBtn").addEventListener("click", function () {
+    if (state.viewMonth === 0) { state.viewYear -= 1; state.viewMonth = 11; }
+    else { state.viewMonth -= 1; }
+    renderCalendar();
+  });
+  document.getElementById("nextMonthBtn").addEventListener("click", function () {
+    if (state.viewMonth === 11) { state.viewYear += 1; state.viewMonth = 0; }
+    else { state.viewMonth += 1; }
+    renderCalendar();
+  });
+
+  // ---- init ---------------------------------------------------------------
+  renderWeekdayRow();
+  document.getElementById("calGrid").innerHTML =
+    '<div class="empty-note" style="grid-column: 1 / -1;"><span class="spin">⟳</span> Google Sheets에서 불러오는 중…</div>';
+  renderLegend();
+  loadAllEntries().then(function (entries) {
+    state.entries = entries;
+    renderCalendar();
+  });
+})();
+</script>
+</body>
+</html>
