@@ -213,7 +213,8 @@
 
     /* Reduce the box's own left margin instead of resizing the columns —
        photo and stat-col stay at their normal 1:1 split. */
-    .stat-box { padding-left: 4px; }
+    .stat-box { padding-left: 2px; gap: 5px; }
+    .stat-box .stat-label { flex-basis: 46px; }
     .stat-box input { flex: 1 1 42px; }
 
     /* The toast used to sit right over the modal's save/delete buttons on
@@ -776,7 +777,10 @@
     }
     // Copies the currently displayed photo straight to the clipboard so it
     // can be pasted elsewhere (a chat, a note, another app) without saving
-    // the file first.
+    // the file first. The blob must be produced via a Promise handed to
+    // ClipboardItem synchronously inside the click handler — Safari silently
+    // no-ops the write if there's an `await`/`.then()` chain before it,
+    // because by then the "user gesture" it requires has already expired.
     function bindCopyPhotoBtn() {
       var btn = document.getElementById("copyPhotoBtn");
       if (!btn) return;
@@ -786,9 +790,16 @@
           showToast("이 브라우저에서는 복사가 지원되지 않아요");
           return;
         }
-        fetch(img.src).then(function (res) { return res.blob(); }).then(function (blob) {
-          return navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-        }).then(function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        var blobPromise = new Promise(function (resolve, reject) {
+          canvas.toBlob(function (blob) {
+            if (blob) resolve(blob); else reject(new Error("toBlob failed"));
+          }, "image/png");
+        });
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]).then(function () {
           showToast("사진을 복사했어요");
         }).catch(function () {
           showToast("복사에 실패했어요");
