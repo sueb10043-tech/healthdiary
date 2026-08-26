@@ -157,6 +157,23 @@
   .bulk-save-btn { background: #7E8F3F; color: #fff; border: none; border-radius: 9px; padding: 10px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .bulk-save-btn[disabled] { background: #8FA070; cursor: default; }
   .bulk-close-btn { background: #F0F2EB; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #5B6B63; font-size: 15px; cursor: pointer; }
+
+  .weekly-modal { max-width: 480px; }
+  .weekly-range-row { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .weekly-range-row .fld { display: flex; flex-direction: column; gap: 4px; }
+  .weekly-range-row label { font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; }
+  .weekly-range-row input[type="date"] { border: 1px solid #D7DED2; border-radius: 7px; padding: 7px 9px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  .weekly-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  .weekly-table th { text-align: left; padding: 7px 8px; font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; background: #F3F5EE; border-bottom: 1px solid #E1E6DC; }
+  .weekly-table td { padding: 7px 8px; border-bottom: 1px solid #EEF0EA; font-family: 'IBM Plex Mono', monospace; }
+  .weekly-table td.week-label { font-family: 'Work Sans', sans-serif; color: #20302B; }
+  .weekly-empty-note { color: #6B7A70; font-size: 12.5px; padding: 16px 0; text-align: center; }
+  .month-picker-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .month-picker-nav .nav-arrow { background: transparent; border: none; font-size: 18px; color: #5B6B63; cursor: pointer; padding: 4px 12px; }
+  .month-picker-nav .nav-arrow:hover { background: #EEF1E4; border-radius: 6px; }
+  .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .month-grid-btn { padding: 11px 0; border: 1px solid #D7DED2; border-radius: 8px; background: #fff; font-size: 13px; font-family: 'Work Sans', sans-serif; cursor: pointer; color: #20302B; }
+  .month-grid-btn.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; font-weight: 600; }
   /* On wider (PC) screens, scale the whole calendar up — the aspect-ratio
      on each cell keeps them square, so this just makes everything bigger,
      not distorted. */
@@ -236,6 +253,7 @@
     <div class="top-header-row">
       <div class="eyebrow">DAILY LOG<span id="saveStatusDot" class="save-dot"></span></div>
       <div style="display:flex; gap:8px;">
+        <button id="weeklyAvgBtn" class="bulk-open-btn">📅 주간 평균</button>
         <button id="exportImageBtn" class="bulk-open-btn">📊 표로 저장</button>
         <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
       </div>
@@ -261,6 +279,7 @@
 
   <div id="modalRoot"></div>
   <div id="bulkModalRoot"></div>
+  <div id="weeklyModalRoot"></div>
   <div id="lightboxRoot"></div>
   <div id="toastRoot"></div>
 
@@ -1358,6 +1377,273 @@
       }
     }, "image/png");
   }
+
+  // ---- weekly average table ----------------------------------------------
+  // Weeks are calendar Mon–Sun, expanded outward from the selected range so
+  // every week shown is a complete 7-day week (e.g. picking Aug 1 when it
+  // falls on a Saturday still shows the full Jul 27–Aug 2 week). Each
+  // column's average only counts the days that actually have that field
+  // filled in — missing days are skipped, not treated as 0.
+  function mondayOfWeek(d) {
+    var day = d.getDay(); // 0=Sun..6=Sat
+    var diff = day === 0 ? -6 : 1 - day;
+    var monday = new Date(d);
+    monday.setDate(d.getDate() + diff);
+    return monday;
+  }
+
+  function fmtWeekDate(d) {
+    return (d.getMonth() + 1) + "/" + pad2(d.getDate()) + "(" + WEEKDAYS[d.getDay()] + ")";
+  }
+
+  function average(nums) {
+    if (nums.length === 0) return null;
+    var sum = nums.reduce(function (a, b) { return a + b; }, 0);
+    return sum / nums.length;
+  }
+
+  function buildWeeklyRows(startIso, endIso) {
+    var start = new Date(startIso + "T00:00:00");
+    var end = new Date(endIso + "T00:00:00");
+    if (isNaN(start) || isNaN(end) || start > end) return [];
+
+    var weekStart = mondayOfWeek(start);
+    var rows = [];
+    var guard = 0;
+    while (weekStart <= end && guard < 60) {
+      var weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+
+      var weights = [], calories = [], steps = [];
+      var cursor = new Date(weekStart);
+      for (var i = 0; i < 7; i++) {
+        var iso = isoOf(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+        var entry = state.entries[iso];
+        if (entry) {
+          if (entry.weight && !isNaN(parseFloat(entry.weight))) weights.push(parseFloat(entry.weight));
+          if (entry.calories && !isNaN(parseFloat(entry.calories))) calories.push(parseFloat(entry.calories));
+          if (entry.steps && !isNaN(parseFloat(entry.steps))) steps.push(parseFloat(entry.steps));
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      rows.push({
+        label: fmtWeekDate(weekStart) + " ~ " + fmtWeekDate(weekEnd),
+        weightAvg: average(weights),
+        caloriesAvg: average(calories),
+        stepsAvg: average(steps)
+      });
+
+      weekStart = new Date(weekStart);
+      weekStart.setDate(weekStart.getDate() + 7);
+      guard++;
+    }
+    return rows;
+  }
+
+  function defaultWeeklyRange() {
+    var now = new Date();
+    var isCurrentMonth = state.viewYear === now.getFullYear() && state.viewMonth === now.getMonth();
+    var startIso = isoOf(state.viewYear, state.viewMonth, 1);
+    var endIso = isCurrentMonth
+      ? todayStr()
+      : isoOf(state.viewYear, state.viewMonth, daysInMonth(state.viewYear, state.viewMonth));
+    return { startIso: startIso, endIso: endIso };
+  }
+
+  // Holds the set of individually-picked months (e.g. "6월, 8월" skipping
+  // July) when the person uses "월 선택" instead of a plain date range.
+  // Each selected month contributes its own weekly rows independently, so
+  // gaps between non-adjacent months never get bridged into one fake week.
+  var weeklySelectedMonths = []; // array of "YYYY-MM" strings
+
+  function monthLabel(ym) {
+    var parts = ym.split("-").map(Number);
+    return parts[0] + "년 " + parts[1] + "월";
+  }
+
+  function monthToIsoRange(ym) {
+    var now = new Date();
+    var currentYm = now.getFullYear() + "-" + pad2(now.getMonth() + 1);
+    var parts = ym.split("-").map(Number);
+    var startIso = isoOf(parts[0], parts[1] - 1, 1);
+    var endIso = ym === currentYm ? todayStr() : isoOf(parts[0], parts[1] - 1, daysInMonth(parts[0], parts[1] - 1));
+    return { startIso: startIso, endIso: endIso };
+  }
+
+  function renderWeeklyTable() {
+    var body = document.getElementById("weeklyTableBody");
+    var rows = [];
+
+    if (weeklySelectedMonths.length > 0) {
+      weeklySelectedMonths.slice().sort().forEach(function (ym) {
+        var r = monthToIsoRange(ym);
+        rows = rows.concat(buildWeeklyRows(r.startIso, r.endIso));
+      });
+    } else {
+      var startIso = document.getElementById("weeklyStart").value;
+      var endIso = document.getElementById("weeklyEnd").value;
+      if (!startIso || !endIso || startIso > endIso) {
+        body.innerHTML = '<div class="weekly-empty-note">시작일이 종료일보다 앞서야 해요.</div>';
+        return;
+      }
+      rows = buildWeeklyRows(startIso, endIso);
+    }
+
+    if (rows.length === 0) {
+      body.innerHTML = '<div class="weekly-empty-note">표시할 주가 없어요.</div>';
+      return;
+    }
+    var html = '<table class="weekly-table"><thead><tr>' +
+      "<th>주</th><th>체중 평균(kg)</th><th>칼로리 평균(kcal)</th><th>걸음수 평균(보)</th>" +
+      "</tr></thead><tbody>";
+    rows.forEach(function (r) {
+      html += "<tr>" +
+        '<td class="week-label">' + r.label + "</td>" +
+        "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1)) + "</td>" +
+        "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg)) + "</td>" +
+        "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg)) + "</td>" +
+        "</tr>";
+    });
+    html += "</tbody></table>";
+    body.innerHTML = html;
+  }
+
+  function renderWeeklyMonthTag() {
+    var tag = document.getElementById("weeklyMonthTag");
+    if (!tag) return;
+    if (weeklySelectedMonths.length === 0) {
+      tag.innerHTML = "";
+      return;
+    }
+    var labels = weeklySelectedMonths.slice().sort().map(monthLabel).join(", ");
+    tag.innerHTML = '선택한 월: ' + labels + ' <a href="#" id="weeklyClearMonths" style="color:#8C4A3C;">✕ 초기화</a>';
+    document.getElementById("weeklyClearMonths").addEventListener("click", function (e) {
+      e.preventDefault();
+      weeklySelectedMonths = [];
+      renderWeeklyMonthTag();
+      renderWeeklyTable();
+    });
+  }
+
+  var monthPickerYear = null; // set when the popup opens; persists across ‹ › navigation
+
+  function renderMonthPickerPopup() {
+    var monthButtons = "";
+    for (var m = 1; m <= 12; m++) {
+      var ym = monthPickerYear + "-" + pad2(m);
+      var active = weeklySelectedMonths.indexOf(ym) !== -1;
+      monthButtons += '<button type="button" class="month-grid-btn' + (active ? " active" : "") + '" data-ym="' + ym + '">' + m + "월</button>";
+    }
+
+    var root = document.getElementById("monthPickerOverlay");
+    var isNew = !root;
+    var innerHtml =
+      '<div class="bulk-modal" style="max-width:320px;">' +
+        '<div class="bulk-head">' +
+          '<div class="title">월 선택</div>' +
+          '<button class="bulk-close-btn" id="monthPickerCloseBtn">✕</button>' +
+        '</div>' +
+        '<div class="month-picker-nav">' +
+          '<button type="button" class="nav-arrow" id="monthPickerPrevYear">‹</button>' +
+          '<div class="title" style="font-size:15px;">' + monthPickerYear + '년</div>' +
+          '<button type="button" class="nav-arrow" id="monthPickerNextYear">›</button>' +
+        '</div>' +
+        '<div class="month-grid">' + monthButtons + '</div>' +
+        '<button class="bulk-save-btn" id="monthPickerApplyBtn" style="width:100%;">적용</button>' +
+      '</div>';
+
+    if (isNew) {
+      document.getElementById("weeklyModalRoot").insertAdjacentHTML("beforeend",
+        '<div class="bulk-overlay" id="monthPickerOverlay" style="z-index:70;">' + innerHtml + '</div>');
+    } else {
+      root.innerHTML = innerHtml;
+    }
+    bindMonthPickerPopupEvents();
+  }
+
+  function bindMonthPickerPopupEvents() {
+    document.getElementById("monthPickerOverlay").addEventListener("click", function (e) {
+      if (e.target.id === "monthPickerOverlay") closeMonthPickerPopup();
+    });
+    document.getElementById("monthPickerCloseBtn").addEventListener("click", closeMonthPickerPopup);
+    document.getElementById("monthPickerPrevYear").addEventListener("click", function () {
+      monthPickerYear -= 1;
+      renderMonthPickerPopup();
+    });
+    document.getElementById("monthPickerNextYear").addEventListener("click", function () {
+      monthPickerYear += 1;
+      renderMonthPickerPopup();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".month-grid-btn"), function (btn) {
+      btn.addEventListener("click", function () {
+        var ym = btn.getAttribute("data-ym");
+        var idx = weeklySelectedMonths.indexOf(ym);
+        if (idx === -1) weeklySelectedMonths.push(ym); else weeklySelectedMonths.splice(idx, 1);
+        btn.classList.toggle("active", idx === -1);
+      });
+    });
+    document.getElementById("monthPickerApplyBtn").addEventListener("click", function () {
+      closeMonthPickerPopup();
+      renderWeeklyMonthTag();
+      renderWeeklyTable();
+    });
+  }
+
+  function openMonthPickerPopup() {
+    monthPickerYear = state.viewYear;
+    renderMonthPickerPopup();
+  }
+
+  function closeMonthPickerPopup() {
+    var el = document.getElementById("monthPickerOverlay");
+    if (el) el.remove();
+  }
+
+  function openWeeklyModal() {
+    weeklySelectedMonths = [];
+    var range = defaultWeeklyRange();
+    document.getElementById("weeklyModalRoot").innerHTML =
+      '<div class="bulk-overlay" id="weeklyOverlay">' +
+        '<div class="bulk-modal weekly-modal">' +
+          '<div class="bulk-head">' +
+            '<div class="title">주간 평균</div>' +
+            '<button class="bulk-close-btn" id="weeklyCloseBtn">✕</button>' +
+          '</div>' +
+          '<div class="weekly-range-row">' +
+            '<div class="fld"><label>시작일</label><input type="date" id="weeklyStart" value="' + range.startIso + '" /></div>' +
+            '<div class="fld"><label>종료일</label><input type="date" id="weeklyEnd" value="' + range.endIso + '" /></div>' +
+            '<button class="bulk-load-btn" id="weeklyMonthPickBtn" style="margin-left:auto;">월 선택</button>' +
+          '</div>' +
+          '<div id="weeklyMonthTag" style="font-size:12px; color:#6B7A70; margin-bottom:10px;"></div>' +
+          '<div id="weeklyTableBody"></div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById("weeklyOverlay").addEventListener("click", function (e) {
+      if (e.target.id === "weeklyOverlay") closeWeeklyModal();
+    });
+    document.getElementById("weeklyCloseBtn").addEventListener("click", closeWeeklyModal);
+    document.getElementById("weeklyMonthPickBtn").addEventListener("click", openMonthPickerPopup);
+    document.getElementById("weeklyStart").addEventListener("change", function () {
+      weeklySelectedMonths = [];
+      renderWeeklyMonthTag();
+      renderWeeklyTable();
+    });
+    document.getElementById("weeklyEnd").addEventListener("change", function () {
+      weeklySelectedMonths = [];
+      renderWeeklyMonthTag();
+      renderWeeklyTable();
+    });
+
+    renderWeeklyTable();
+  }
+
+  function closeWeeklyModal() {
+    document.getElementById("weeklyModalRoot").innerHTML = "";
+  }
+
+  document.getElementById("weeklyAvgBtn").addEventListener("click", openWeeklyModal);
 
   document.getElementById("exportImageBtn").addEventListener("click", function () {
     // Give web fonts a moment to be ready so the canvas text renders with
