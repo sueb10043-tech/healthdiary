@@ -196,6 +196,7 @@
        room so the value itself doesn't get clipped. */
     .stat-box input { font-size: 16px; }
     .exercise-cal input { font-size: 16px; width: 60px; }
+    .note-box textarea { font-size: 16px; }
 
     /* Not enough width for icon + label on all three flag buttons at once —
        show just the emoji on mobile. */
@@ -366,8 +367,8 @@
 
   // ---- image compression --------------------------------------------
   function fileToCompressedDataUrl(file, maxSize, quality) {
-    maxSize = maxSize || 640;
-    quality = quality || 0.55;
+    maxSize = maxSize || 1080;
+    quality = quality || 0.78;
     return new Promise(function (resolve, reject) {
       var reader = new FileReader();
       reader.onerror = function () { reject(new Error("read failed")); };
@@ -722,7 +723,24 @@
     }
     function bindPasteCatcher() {
       var catcher = document.getElementById("pasteCatcherInput");
-      if (catcher) catcher.addEventListener("paste", pasteHandler);
+      if (!catcher) return;
+      catcher.addEventListener("paste", pasteHandler);
+      // Try reading the clipboard as soon as it's tapped, so on browsers
+      // that support it a single tap is enough — no long-press needed.
+      // If it's unsupported or permission isn't granted, this just fails
+      // quietly and the long-press "붙여넣기" menu still works as a fallback.
+      catcher.addEventListener("click", function () {
+        if (!navigator.clipboard || !navigator.clipboard.read) return;
+        navigator.clipboard.read().then(function (items) {
+          for (var i = 0; i < items.length; i++) {
+            var imageType = items[i].types.filter(function (t) { return t.indexOf("image/") === 0; })[0];
+            if (imageType) {
+              items[i].getType(imageType).then(function (blob) { handleIncomingImageFile(blob); });
+              return;
+            }
+          }
+        }).catch(function () { /* no permission / nothing to read — fall back to long-press */ });
+      });
     }
     bindPhotoInputTrigger("photoPlaceholderBtn");
     bindPasteCatcher();
