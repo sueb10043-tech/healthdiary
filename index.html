@@ -164,9 +164,10 @@
   .weekly-range-row label { font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; }
   .weekly-range-row input[type="date"] { border: 1px solid #D7DED2; border-radius: 7px; padding: 7px 9px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
   .weekly-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-  .weekly-table th { text-align: left; padding: 7px 8px; font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; background: #F3F5EE; border-bottom: 1px solid #E1E6DC; }
+  .weekly-table th { text-align: left; padding: 7px 8px; font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; background: #F3F5EE; border-bottom: 1px solid #E1E6DC; white-space: nowrap; }
   .weekly-table td { padding: 7px 8px; border-bottom: 1px solid #EEF0EA; font-family: 'IBM Plex Mono', monospace; }
-  .weekly-table td.week-label { font-family: 'Work Sans', sans-serif; color: #20302B; }
+  .weekly-table td.week-label { font-family: 'Work Sans', sans-serif; color: #20302B; white-space: nowrap; }
+  .weekly-table .wk-short { display: none; }
   .weekly-empty-note { color: #6B7A70; font-size: 12.5px; padding: 16px 0; text-align: center; }
   .month-picker-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .month-picker-nav .nav-arrow { background: transparent; border: none; font-size: 18px; color: #5B6B63; cursor: pointer; padding: 4px 12px; }
@@ -205,6 +206,9 @@
     /* Not enough width for "체중 평균(kg)" etc. on one line — drop the
        unit from the header only; the data cells still show it per value. */
     .weekly-table .th-unit { display: none; }
+    .weekly-table .wk-full { display: none; }
+    .weekly-table .wk-short { display: inline; }
+    #weeklyTableBody { overflow-x: auto; }
 
     /* Drop the card surface entirely — background stays whatever the page
        already is — so the table itself can run edge to edge. */
@@ -375,7 +379,12 @@
   function gasFetch(params, body) {
     var url = GAS_URL + (params ? "?" + params : "");
     var opts = body
-      ? { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body) }
+      // keepalive tells the browser to finish sending this request even if
+      // the page is backgrounded/closed right after — which is exactly what
+      // happens a lot on mobile (tap save, immediately switch apps). Note:
+      // it only covers requests under ~64KB, so a save with a new photo
+      // attached is still at the mercy of the tab staying open a bit.
+      ? { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), keepalive: true }
       : { method: "GET" };
     return fetch(url, opts).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
@@ -1405,6 +1414,10 @@
     return (d.getMonth() + 1) + "/" + pad2(d.getDate()) + "(" + WEEKDAYS[d.getDay()] + ")";
   }
 
+  function fmtWeekDateShort(d) {
+    return (d.getMonth() + 1) + "/" + pad2(d.getDate());
+  }
+
   function average(nums) {
     if (nums.length === 0) return null;
     var sum = nums.reduce(function (a, b) { return a + b; }, 0);
@@ -1438,6 +1451,7 @@
 
       rows.push({
         label: fmtWeekDate(weekStart) + " ~ " + fmtWeekDate(weekEnd),
+        labelShort: fmtWeekDateShort(weekStart) + " ~ " + fmtWeekDateShort(weekEnd),
         weightAvg: average(weights),
         caloriesAvg: average(calories),
         stepsAvg: average(steps)
@@ -1510,7 +1524,7 @@
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
       html += "<tr>" +
-        '<td class="week-label">' + r.label + "</td>" +
+        '<td class="week-label"><span class="wk-full">' + r.label + '</span><span class="wk-short">' + r.labelShort + "</span></td>" +
         "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + "kg") + "</td>" +
         "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + "kcal") + "</td>" +
         "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + "보") + "</td>" +
