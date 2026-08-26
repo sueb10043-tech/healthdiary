@@ -169,11 +169,24 @@
      screen, closer to a native calendar app. */
   @media (max-width: 480px) {
     #wrap { padding: 14px 8px 24px; }
-    .top-header-row { margin-bottom: 14px; }
+    .top-header-row { margin-bottom: 7px; }
     .cal-card { padding: 10px; border-radius: 12px; }
-    .cal-grid { gap: 3px; }
+
+    /* Plain table look instead of nested rounded boxes: no gap between
+       cells, thin dividing lines instead, plain white cell background. */
+    .cal-grid { gap: 0; border-top: 1px solid #E1E6DC; border-left: 1px solid #E1E6DC; }
     .cal-weekday { padding: 2px 0 4px; }
-    .cal-cell { aspect-ratio: auto; min-height: 61px; padding: 4px 5px; border-radius: 7px; }
+    .cal-cell {
+      aspect-ratio: auto;
+      min-height: 64px;
+      padding: 4px 5px;
+      border-radius: 0;
+      border: none;
+      border-right: 1px solid #E1E6DC;
+      border-bottom: 1px solid #E1E6DC;
+      background-color: #ffffff;
+    }
+    .cal-cell.today { border: none; border-right: 1px solid #E1E6DC; border-bottom: 1px solid #E1E6DC; box-shadow: inset 0 0 0 1.5px #7E8F3F; }
     .cal-cell .cond-emoji { font-size: 7.5px; letter-spacing: -0.5px; }
     .legend { margin-top: 8px; }
 
