@@ -81,7 +81,7 @@
   .photo-btn.remove { top: 5px; right: 5px; }
   .photo-btn.swap { bottom: 5px; right: 5px; width: auto; border-radius: 6px; padding: 3px 7px; font-size: 9.5px; }
 
-  .stat-col { flex: 1; min-width: 0; height: 160px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-col { flex: 1; min-width: 0; height: 200px; display: flex; flex-direction: column; gap: 6px; }
   .stat-box { flex: 1; min-width: 0; min-height: 0; border: 1px solid #D7DED2; border-radius: 8px; background: #fff; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 3px 8px 3px 14px; overflow: hidden; }
   .stat-box .stat-label { flex: 0 0 54px; text-align: right; font-family: 'Work Sans', sans-serif; font-size: 9px; color: #8A9689; white-space: nowrap; }
   .stat-box input { flex: 0 1 42px; min-width: 0; border: none; text-align: right; font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: #20302B; background: transparent; }
@@ -641,6 +641,9 @@
               '<div class="stat-box"><span class="stat-label">허리 치수2</span>' +
                 '<input type="number" inputmode="decimal" id="waist2Input" placeholder="0" value="' +
                   escapeHtml(existing.waist2 || "") + '" /><span class="unit">cm</span></div>' +
+              '<div class="stat-box"><span class="stat-label">걸음수</span>' +
+                '<input type="number" inputmode="numeric" id="stepsInput" placeholder="0" value="' +
+                  escapeHtml(existing.steps || "") + '" /><span class="unit">보</span></div>' +
             '</div>' +
           '</div>' +
 
@@ -887,8 +890,9 @@
       var exerciseCalories = document.getElementById("exerciseCaloriesInput").value.trim();
       var waist1 = document.getElementById("waist1Input").value.trim();
       var waist2 = document.getElementById("waist2Input").value.trim();
+      var steps = document.getElementById("stepsInput").value.trim();
 
-      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note && !draft.exercised && !waist1 && !waist2) {
+      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note && !draft.exercised && !waist1 && !waist2 && !steps) {
         showToast("사진이나 컨디션 중 하나는 기록해 주세요");
         return;
       }
@@ -904,6 +908,7 @@
         drinking: draft.drinking,
         waist1: waist1,
         waist2: waist2,
+        steps: steps,
         existingPhotoFileId: draft.photoFileId || ""
       };
       if (draft.photoIsNew && draft.photo) payload.photoBase64 = draft.photo;
@@ -925,6 +930,7 @@
         drinking: draft.drinking,
         waist1: waist1,
         waist2: waist2,
+        steps: steps,
         photo: draft.removePhoto ? "" : (payload.photoBase64 ? draft.photo : (state.entries[iso] && state.entries[iso].photo) || ""),
         photoFileId: draft.photoFileId || ""
       };
@@ -966,6 +972,9 @@
       exerciseCalories: (existing && existing.exerciseCalories) || "",
       cheatDay: !!(existing && existing.cheatDay), // not shown in this view, but preserved on save
       drinking: !!(existing && existing.drinking), // not shown in this view, but preserved on save
+      waist1: (existing && existing.waist1) || "", // not shown in this view, but preserved on save
+      waist2: (existing && existing.waist2) || "", // not shown in this view, but preserved on save
+      steps: (existing && existing.steps) || "", // not shown in this view, but preserved on save
       note: (existing && existing.note) || "" // not shown in this view, but preserved on save
     };
   }
@@ -1168,6 +1177,9 @@
         exerciseCalories: d.exercised ? d.exerciseCalories : "",
         cheatDay: d.cheatDay,
         drinking: d.drinking,
+        waist1: d.waist1,
+        waist2: d.waist2,
+        steps: d.steps,
         existingPhotoFileId: (state.entries[iso] && state.entries[iso].photoFileId) || ""
       };
       saveEntryToSheet(iso, payload).then(function (res) {
@@ -1180,6 +1192,9 @@
           exerciseCalories: payload.exerciseCalories,
           cheatDay: d.cheatDay,
           drinking: d.drinking,
+          waist1: d.waist1,
+          waist2: d.waist2,
+          steps: d.steps,
           photo: (state.entries[iso] && state.entries[iso].photo) || "",
           photoFileId: (res && res.photoFileId) || (state.entries[iso] && state.entries[iso].photoFileId) || ""
         };
