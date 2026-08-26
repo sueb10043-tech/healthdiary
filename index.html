@@ -68,7 +68,7 @@
   .photo-placeholder .icon { font-size: 17px; }
   .photo-placeholder .txt { font-size: 11px; }
   .paste-catcher { width: 100%; max-width: 200px; border: 1px dashed #C9D0C7; border-radius: 6px; padding: 5px 8px; font-size: 16px; color: #8A9689; text-align: center; background: #fff; }
-  .paste-catcher::placeholder { color: #A9B3AC; }
+  .paste-catcher::placeholder { color: #5B6B63; font-size: 11px; font-family: 'Work Sans', sans-serif; }
   .photo-preview-wrap { position: relative; height: 160px; overflow: hidden; border-radius: 10px; border: 1px solid #D7DED2; background: #F3F5EE; }
   .photo-preview-wrap img { position: absolute; left: 0; bottom: 0; width: 100%; height: auto; display: block; cursor: zoom-in; }
   .photo-btn { position: absolute; background: rgba(32,48,43,0.72); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10.5px; }
@@ -176,9 +176,9 @@
        cells, thin dividing lines instead, plain white cell background. */
     .cal-grid { gap: 0; border-top: 1px solid #E1E6DC; border-left: 1px solid #E1E6DC; }
     .cal-weekday { padding: 2px 0 4px; }
-    .cal-cell {
+    .cal-cell, .cal-cell-empty {
       aspect-ratio: auto;
-      min-height: 64px;
+      min-height: 70px;
       padding: 4px 5px;
       border-radius: 0;
       border: none;
@@ -190,14 +190,16 @@
     .cal-cell .cond-emoji { font-size: 7.5px; letter-spacing: -0.5px; }
     .legend { margin-top: 8px; }
 
-    /* iOS Safari auto-zooms into any focused input under 16px font-size —
-       keeping these at 16px (and matching the label/unit to it) stops that,
-       so typing here no longer forces the whole page to zoom in and out. */
-    .stat-box { gap: 6px; padding: 3px 6px 3px 10px; }
-    .stat-box .stat-label { flex-basis: 64px; font-size: 16px; }
+    /* Keeping the actual input at 16px stops iOS Safari's auto-zoom on
+       focus; the label/unit are plain text (not focusable), so they don't
+       need to be that big — reverting them to the compact size frees up
+       room so the value itself doesn't get clipped. */
     .stat-box input { font-size: 16px; }
-    .stat-box .unit { font-size: 16px; }
     .exercise-cal input { font-size: 16px; width: 60px; }
+
+    /* Not enough width for icon + label on all three flag buttons at once —
+       show just the emoji on mobile. */
+    .exercise-toggle .flag-label { display: none; }
   }
 </style>
 </head>
@@ -281,7 +283,7 @@
       '<button type="button" class="photo-placeholder-btn" id="photoPlaceholderBtn">' +
         '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
       '</button>' +
-      '<input type="text" class="paste-catcher" id="pasteCatcherInput" placeholder="여기를 길게 눌러 붙여넣기" />' +
+      '<input type="text" class="paste-catcher" id="pasteCatcherInput" placeholder="붙여넣기" />' +
     '</div>';
   }
 
@@ -508,7 +510,7 @@
     var today = todayStr();
     var html = "";
     cells.forEach(function (day, idx) {
-      if (day === null) { html += "<div></div>"; return; }
+      if (day === null) { html += '<div class="cal-cell-empty"></div>'; return; }
       var iso = isoOf(state.viewYear, state.viewMonth, day);
       var entry = state.entries[iso];
       var weekdayIdx = idx % 7;
@@ -617,7 +619,7 @@
 
           '<div class="exercise-row">' +
             '<button type="button" class="exercise-toggle' + (draft.exercised ? " active" : "") + '" id="exerciseToggleBtn">' +
-              '<span>' + EXERCISE_EMOJI + '</span><span>운동</span>' +
+              '<span>' + EXERCISE_EMOJI + '</span><span class="flag-label">운동</span>' +
             '</button>' +
             '<div class="exercise-cal">' +
               '<input type="number" inputmode="numeric" id="exerciseCaloriesInput" placeholder="0" value="' +
@@ -625,10 +627,10 @@
             '</div>' +
             '<div class="flag-right-group">' +
               '<button type="button" class="exercise-toggle' + (draft.cheatDay ? " active" : "") + '" id="cheatToggleBtn">' +
-                '<span>🍔</span><span>치팅</span>' +
+                '<span>🍔</span><span class="flag-label">치팅</span>' +
               '</button>' +
               '<button type="button" class="exercise-toggle' + (draft.drinking ? " active" : "") + '" id="drinkToggleBtn">' +
-                '<span>🍺</span><span>음주</span>' +
+                '<span>🍺</span><span class="flag-label">음주</span>' +
               '</button>' +
             '</div>' +
           '</div>' +
