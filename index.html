@@ -209,7 +209,7 @@
        room so the value itself doesn't get clipped. */
     .stat-box input { font-size: 16px; }
     .exercise-cal input { font-size: 16px; width: 60px; }
-    .note-box textarea { font-size: 16px; height: 53px; }
+    .note-box textarea { font-size: 16px; height: 58px; }
 
     /* Give the labels a bit more breathing room from the edge, and keep
        the number input a fixed comfortable width instead of stretching to
@@ -223,6 +223,7 @@
     /* The toast used to sit right over the modal's save/delete buttons on
        phones — push it up above them instead. */
     .toast { bottom: 90px; }
+
 
     /* Not enough width for icon + label on all three flag buttons at once —
        show just the emoji on mobile. */
@@ -612,8 +613,7 @@
 
     var photoBlock = draft.photo
       ? '<div class="photo-preview-wrap"><img id="photoImg" src="' + draft.photo + '" alt="식단 사진" />' +
-        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button>' +
-        '<button type="button" class="photo-btn swap" id="copyPhotoBtn">복사</button></div>'
+        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button></div>'
       : emptyPhotoPlaceholderHtml();
 
     var hasExisting = !!state.entries[iso];
@@ -781,41 +781,9 @@
         }).catch(function () { /* no permission / nothing to read — fall back to long-press */ });
       });
     }
-    // Copies the currently displayed photo straight to the clipboard so it
-    // can be pasted elsewhere (a chat, a note, another app) without saving
-    // the file first. The blob must be produced via a Promise handed to
-    // ClipboardItem synchronously inside the click handler — Safari silently
-    // no-ops the write if there's an `await`/`.then()` chain before it,
-    // because by then the "user gesture" it requires has already expired.
-    function bindCopyPhotoBtn() {
-      var btn = document.getElementById("copyPhotoBtn");
-      if (!btn) return;
-      btn.addEventListener("click", function () {
-        var img = document.getElementById("photoImg");
-        if (!img || !navigator.clipboard || !window.ClipboardItem) {
-          showToast("이 브라우저에서는 복사가 지원되지 않아요");
-          return;
-        }
-        var canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        var blobPromise = new Promise(function (resolve, reject) {
-          canvas.toBlob(function (blob) {
-            if (blob) resolve(blob); else reject(new Error("toBlob failed"));
-          }, "image/png");
-        });
-        navigator.clipboard.write([new ClipboardItem({ "image/png": blobPromise })]).then(function () {
-          showToast("사진을 복사했어요");
-        }).catch(function () {
-          showToast("복사에 실패했어요");
-        });
-      });
-    }
 
     bindPhotoInputTrigger("photoPlaceholderBtn");
     bindPasteCatcher();
-    bindCopyPhotoBtn();
 
     var removeBtn = document.getElementById("removePhotoBtn");
     if (removeBtn) removeBtn.addEventListener("click", function () {
@@ -834,8 +802,7 @@
       var slot = document.getElementById("photoSlot");
       slot.innerHTML =
         '<div class="photo-preview-wrap"><img id="photoImg" src="' + dataUrl + '" alt="식단 사진" />' +
-        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button>' +
-        '<button type="button" class="photo-btn swap" id="copyPhotoBtn">복사</button></div>';
+        '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button></div>';
       bindPhotoImgClick();
       document.getElementById("removePhotoBtn").addEventListener("click", function () {
         draft.photo = null;
@@ -845,7 +812,6 @@
         bindPhotoInputTrigger("photoPlaceholderBtn");
         bindPasteCatcher();
       });
-      bindCopyPhotoBtn();
     }
 
     function handleIncomingImageFile(file) {
