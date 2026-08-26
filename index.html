@@ -43,7 +43,7 @@
   .cal-cell.today .day-num { color: #4C5C2F; font-weight: 600; }
   .cal-cell .exercise-emoji { font-size: 10px; line-height: 1; }
   .cal-cell .data-stack { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .cal-cell .data-row { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .cal-cell .data-row { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: flex-start; overflow: hidden; }
   .cal-cell .cond-emoji { font-size: 10px; line-height: 1; }
   .cal-cell .stat-txt { font-size: 8px; font-family: 'Work Sans', sans-serif; font-weight: 500; line-height: 1; color: #5B6B63; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -140,6 +140,23 @@
   .bulk-save-btn { background: #7E8F3F; color: #fff; border: none; border-radius: 9px; padding: 10px 20px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .bulk-save-btn[disabled] { background: #8FA070; cursor: default; }
   .bulk-close-btn { background: #F0F2EB; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #5B6B63; font-size: 15px; cursor: pointer; }
+  /* On wider (PC) screens, scale the whole calendar up — the aspect-ratio
+     on each cell keeps them square, so this just makes everything bigger,
+     not distorted. */
+  @media (min-width: 720px) {
+    #wrap { max-width: 900px; }
+    .cal-card { padding: 26px; }
+    .cal-grid { gap: 8px; }
+    .cal-title { font-size: 20px; }
+    .cal-weekday { font-size: 14px; padding: 3px 0 9px; }
+    .cal-cell { padding: 6px 8px; border-radius: 12px; }
+    .cal-cell .day-num { font-size: 15px; }
+    .cal-cell .exercise-emoji { font-size: 14px; }
+    .cal-cell .cond-emoji { font-size: 14px; }
+    .cal-cell .stat-txt { font-size: 12.5px; }
+    .legend { font-size: 13.5px; }
+    .legend .legend-emoji { font-size: 15px; }
+  }
 </style>
 </head>
 <body>
