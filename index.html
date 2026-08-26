@@ -42,6 +42,13 @@
   .cal-cell.sun .day-num { color: #C0392B; }
   .cal-cell.sat .day-num { color: #2E5E8C; }
   .cal-cell.today .day-num { color: #4C5C2F; font-weight: 600; }
+  .cal-cell .day-num.flag-cheat, .cal-cell .day-num.flag-drink, .cal-cell .day-num.flag-both {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; color: #fff !important; font-weight: 600;
+  }
+  .cal-cell .day-num.flag-cheat { background: #2E5E8C; }
+  .cal-cell .day-num.flag-drink { background: #C0392B; }
+  .cal-cell .day-num.flag-both { background: linear-gradient(90deg, #2E5E8C 50%, #C0392B 50%); }
   .cal-cell .exercise-emoji { font-size: 10px; line-height: 1; }
   .cal-cell .icon-group { display: flex; gap: 2px; }
   .cal-cell .data-stack { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -156,6 +163,7 @@
     .cal-cell .exercise-emoji { font-size: 14px; }
     .cal-cell .cond-emoji { font-size: 14px; }
     .cal-cell .stat-txt { font-size: 12.5px; }
+    .cal-cell .day-num.flag-cheat, .cal-cell .day-num.flag-drink, .cal-cell .day-num.flag-both { width: 24px; height: 24px; }
   }
 
   /* On phones, trim the wasted outer padding and stretch each date cell
@@ -195,12 +203,8 @@
     .exercise-cal input { font-size: 16px; width: 60px; }
     .note-box textarea { font-size: 16px; }
 
-    /* The 4 fields next to the photo (calories/weight/waist) were too
-       narrow and clipping text — give them much more of the row's width
-       at the photo's expense, and let the label sit closer to the edge
-       now that there's more room. */
-    .photo-slot { flex: 1; }
-    .stat-col { flex: 3; }
+    /* Reduce the box's own left margin instead of resizing the columns —
+       photo and stat-col stay at their normal 1:1 split. */
     .stat-box { padding-left: 8px; }
 
     /* The toast used to sit right over the modal's save/delete buttons on
@@ -217,7 +221,10 @@
   <div id="wrap">
     <div class="top-header-row">
       <div class="eyebrow">DAILY LOG<span id="saveStatusDot" class="save-dot"></span></div>
-      <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
+      <div style="display:flex; gap:8px;">
+        <button id="exportImageBtn" class="bulk-open-btn">📊 표로 저장</button>
+        <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
+      </div>
     </div>
 
     <div id="errorBox"></div>
@@ -540,14 +547,16 @@
       var weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
       var caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
       var condTxt = condEmojis.length ? condEmojis.join("") : "";
-      var flagIcons = "";
-      if (entry && entry.exercised) flagIcons += EXERCISE_EMOJI;
-      if (entry && entry.cheatDay) flagIcons += "🍔";
-      if (entry && entry.drinking) flagIcons += "🍺";
-      var leftIcons = flagIcons ? '<span class="icon-group exercise-emoji">' + flagIcons + "</span>" : "<span></span>";
+      var leftIcons = (entry && entry.exercised)
+        ? '<span class="icon-group exercise-emoji">' + EXERCISE_EMOJI + "</span>"
+        : "<span></span>";
+      var dayNumClass = "day-num";
+      if (entry && entry.cheatDay && entry.drinking) dayNumClass += " flag-both";
+      else if (entry && entry.cheatDay) dayNumClass += " flag-cheat";
+      else if (entry && entry.drinking) dayNumClass += " flag-drink";
 
       html += '<button class="' + classes.join(" ") + '" data-date="' + iso + '">' +
-        '<span class="top-row">' + leftIcons + '<span class="day-num">' + day + "</span></span>" +
+        '<span class="top-row">' + leftIcons + '<span class="' + dayNumClass + '">' + day + "</span></span>" +
         '<span class="data-stack">' +
           '<span class="data-row"><span class="stat-txt">' + weightTxt + "</span></span>" +
           '<span class="data-row"><span class="stat-txt">' + caloriesTxt + "</span></span>" +
@@ -1139,6 +1148,165 @@
     }
     saveNext(0);
   }
+
+  // ---- month-as-image export ---------------------------------------------
+  // Draws a plain text/number table (no emoji or color-only signals) so an
+  // AI reading the image later can parse every value unambiguously.
+  var CONDITION_EXPORT_LABELS = {
+    success2: "정상 배변",
+    success: "단단한 변",
+    uncomfortable: "복부 가스",
+    allergy: "알러지"
+  };
+
+  var EXPORT_COLUMNS = [
+    { key: "date", label: "날짜", width: 62 },
+    { key: "weight", label: "체중(kg)", width: 66 },
+    { key: "calories", label: "칼로리(kcal)", width: 82 },
+    { key: "condition", label: "컨디션", width: 150 },
+    { key: "exercise", label: "운동", width: 46 },
+    { key: "exCal", label: "소모(kcal)", width: 70 },
+    { key: "waist1", label: "허리1(cm)", width: 70 },
+    { key: "waist2", label: "허리2(cm)", width: 70 },
+    { key: "cheat", label: "치팅", width: 46 },
+    { key: "drink", label: "음주", width: 46 }
+  ];
+
+  function exportRowValues(e) {
+    var condText = e.condition.length
+      ? e.condition.map(function (v) { return CONDITION_EXPORT_LABELS[v] || v; }).join(", ")
+      : "-";
+    return {
+      date: e.day + "(" + e.weekday + ")",
+      weight: e.weight || "-",
+      calories: e.calories || "-",
+      condition: condText,
+      exercise: e.exercised ? "O" : "-",
+      exCal: e.exercised && e.exCal ? e.exCal : "-",
+      waist1: e.waist1 || "-",
+      waist2: e.waist2 || "-",
+      cheat: e.cheat ? "O" : "-",
+      drink: e.drink ? "O" : "-"
+    };
+  }
+
+  function drawMonthTableCanvas(entries, year, month) {
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    var scale = 2;
+
+    var tableW = EXPORT_COLUMNS.reduce(function (a, c) { return a + c.width; }, 0);
+    var rowH = 28;
+    var headerH = 46;
+    var headerRowH = 26;
+    var totalW = tableW + 40;
+    var totalH = headerH + headerRowH + rowH * entries.length + 20;
+
+    canvas.width = totalW * scale;
+    canvas.height = totalH * scale;
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = "#FDFCF8";
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    ctx.fillStyle = "#20302B";
+    ctx.font = "600 15px 'Work Sans', sans-serif";
+    ctx.fillText(year + "년 " + (month + 1) + "월 기록", 20, 26);
+
+    var startX = 20;
+    var startY = headerH;
+
+    ctx.fillStyle = "#F3F5EE";
+    ctx.fillRect(startX, startY, tableW, headerRowH);
+    ctx.fillStyle = "#3A463F";
+    ctx.font = "600 11px 'IBM Plex Mono', monospace";
+    var hx = startX;
+    EXPORT_COLUMNS.forEach(function (col) {
+      ctx.fillText(col.label, hx + 6, startY + headerRowH / 2 + 4);
+      hx += col.width;
+    });
+
+    entries.forEach(function (e, rowIdx) {
+      var vals = exportRowValues(e);
+      var y = startY + headerRowH + rowIdx * rowH;
+      if (rowIdx % 2 === 1) {
+        ctx.fillStyle = "#F7F8F4";
+        ctx.fillRect(startX, y, tableW, rowH);
+      }
+      var cx = startX;
+      EXPORT_COLUMNS.forEach(function (col) {
+        ctx.fillStyle = col.key === "date"
+          ? (e.weekday === "일" ? "#C0392B" : e.weekday === "토" ? "#2E5E8C" : "#20302B")
+          : "#20302B";
+        ctx.font = "12px 'IBM Plex Mono', monospace";
+        var text = String(vals[col.key]);
+        var maxChars = Math.floor(col.width / 6.2);
+        if (text.length > maxChars) text = text.slice(0, maxChars - 1) + "…";
+        ctx.fillText(text, cx + 6, y + rowH / 2 + 4);
+        cx += col.width;
+      });
+    });
+
+    ctx.strokeStyle = "#D7DED2";
+    ctx.lineWidth = 1;
+    var gridH = headerRowH + rowH * entries.length;
+    ctx.strokeRect(startX, startY, tableW, gridH);
+    var vx = startX;
+    EXPORT_COLUMNS.forEach(function (col, i) {
+      if (i > 0) {
+        ctx.beginPath();
+        ctx.moveTo(vx, startY);
+        ctx.lineTo(vx, startY + gridH);
+        ctx.stroke();
+      }
+      vx += col.width;
+    });
+    ctx.beginPath();
+    ctx.moveTo(startX, startY + headerRowH);
+    ctx.lineTo(startX + tableW, startY + headerRowH);
+    ctx.stroke();
+
+    return canvas;
+  }
+
+  function exportMonthTableImage() {
+    var total = daysInMonth(state.viewYear, state.viewMonth);
+    var rows = [];
+    for (var d = 1; d <= total; d++) {
+      var iso = isoOf(state.viewYear, state.viewMonth, d);
+      var entry = state.entries[iso] || {};
+      var wd = new Date(iso + "T00:00:00").getDay();
+      rows.push({
+        day: d,
+        weekday: WEEKDAYS[wd],
+        weight: entry.weight || "",
+        calories: entry.calories || "",
+        condition: sortConditionValues(toConditionArray(entry.condition)),
+        exercised: !!entry.exercised,
+        exCal: entry.exerciseCalories || "",
+        waist1: entry.waist1 || "",
+        waist2: entry.waist2 || "",
+        cheat: !!entry.cheatDay,
+        drink: !!entry.drinking
+      });
+    }
+    var canvas = drawMonthTableCanvas(rows, state.viewYear, state.viewMonth);
+    var link = document.createElement("a");
+    link.download = state.viewYear + "년_" + (state.viewMonth + 1) + "월_기록.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    showToast("이미지로 저장했어요");
+  }
+
+  document.getElementById("exportImageBtn").addEventListener("click", function () {
+    // Give web fonts a moment to be ready so the canvas text renders with
+    // the right typeface instead of a generic fallback.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(exportMonthTableImage);
+    } else {
+      exportMonthTableImage();
+    }
+  });
 
   document.getElementById("openBulkBtn").addEventListener("click", openBulkModal);
 
