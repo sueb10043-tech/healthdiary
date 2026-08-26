@@ -16,7 +16,7 @@
   textarea:focus, input:focus, button:focus-visible { outline: 2px solid #7E8F3F; outline-offset: 2px; }
   #wrap { max-width: 640px; margin: 0 auto; padding: 32px 20px 64px; }
 
-  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: #6B7A70; }
+  .eyebrow { font-family: 'Work Sans', sans-serif; font-size: 12px; letter-spacing: 0.12em; color: #6B7A70; }
 
   .error-box { background: #F4E6E2; border: 1px solid #D9B8AE; color: #8C4A3C; padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 20px; }
 
@@ -30,20 +30,17 @@
   .cal-weekday.sun { color: #C0392B; }
   .cal-weekday.sat { color: #2E5E8C; }
 
-  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 9px; border: 1px solid #E1E6DC; background-color: #F6F7F2; background-size: cover; background-position: center; padding: 0; overflow: hidden; display: flex; align-items: flex-start; justify-content: flex-end; }
+  .cal-cell { position: relative; aspect-ratio: 1 / 1; border-radius: 9px; border: 1px solid #E1E6DC; background-color: #F6F7F2; padding: 0; overflow: hidden; display: flex; align-items: flex-start; justify-content: flex-end; }
   .cal-cell.today { border: 1.5px solid #7E8F3F; }
-  .cal-cell.has-photo::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 55%, rgba(20,28,20,0.55) 100%); }
   .cal-cell .day-num { position: relative; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; padding: 3px 5px; color: #3A463F; }
   .cal-cell.sun .day-num { color: #C0392B; }
   .cal-cell.sat .day-num { color: #2E5E8C; }
   .cal-cell.today .day-num { color: #4C5C2F; font-weight: 600; }
-  .cal-cell.has-photo .day-num { color: #fff; }
   .cal-cell .stack { position: absolute; bottom: 4px; left: 4px; right: 4px; display: flex; flex-direction: column; gap: 1px; }
   .cal-cell .bottom-row { display: flex; align-items: center; gap: 4px; }
   .cal-cell .cond-emoji { font-size: 10px; line-height: 1; flex-shrink: 0; }
   .cal-cell .exercise-emoji { font-size: 10px; line-height: 1; }
-  .cal-cell .stat-txt { font-size: 9px; font-family: 'IBM Plex Mono', monospace; font-weight: 500; line-height: 1; color: #5B6B63; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cal-cell.has-photo .stat-txt { color: #fff; }
+  .cal-cell .stat-txt { font-size: 9px; font-family: 'Work Sans', sans-serif; font-weight: 500; line-height: 1; color: #5B6B63; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .legend { display: flex; gap: 14px; margin-top: 12px; font-size: 11.5px; color: #8A9689; align-items: center; flex-wrap: wrap; }
   .legend .legend-emoji { font-size: 12px; margin-right: 4px; }
@@ -57,23 +54,24 @@
   .modal-head .date-title { font-family: 'Fraunces', serif; font-size: 21px; font-weight: 600; }
   .close-btn { background: #F0F2EB; border: none; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; color: #5B6B63; font-size: 15px; }
 
-  .photo-cal-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: stretch; }
+  .photo-cal-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: flex-start; }
   .photo-slot { flex: 1; position: relative; min-width: 0; }
-  .photo-placeholder { width: 100%; height: 100%; min-height: 88px; border: 1.5px dashed #B7C2AF; border-radius: 10px; background: #F3F5EE; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #5B6B63; }
+  .photo-placeholder { width: 100%; height: 160px; border: 1.5px dashed #B7C2AF; border-radius: 10px; background: #F3F5EE; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #5B6B63; }
   .photo-placeholder .icon { font-size: 17px; }
   .photo-placeholder .txt { font-size: 11px; }
-  .photo-preview-wrap { position: relative; height: 100%; min-height: 88px; }
-  .photo-preview-wrap img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; border: 1px solid #D7DED2; cursor: zoom-in; }
+  .photo-preview-wrap { position: relative; height: 160px; overflow: hidden; border-radius: 10px; border: 1px solid #D7DED2; background: #F3F5EE; }
+  .photo-preview-wrap img { position: absolute; left: 0; bottom: 0; width: 100%; height: auto; display: block; cursor: zoom-in; }
   .photo-btn { position: absolute; background: rgba(32,48,43,0.72); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10.5px; }
   .photo-btn.remove { top: 5px; right: 5px; }
   .photo-btn.swap { bottom: 5px; right: 5px; width: auto; border-radius: 6px; padding: 3px 7px; font-size: 9.5px; }
 
-  .stat-col { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-  .stat-box { flex: 1; border: 1px solid #D7DED2; border-radius: 10px; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 5px 6px; }
-  .stat-box .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8A9689; }
-  .stat-box input { width: 100%; border: none; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 600; color: #20302B; background: transparent; }
+  .stat-col { flex: 1; min-width: 0; height: 160px; display: flex; flex-direction: column; gap: 6px; }
+  .stat-box { flex: 1; min-width: 0; min-height: 0; border: 1px solid #D7DED2; border-radius: 8px; background: #fff; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 3px 8px 3px 14px; overflow: hidden; }
+  .stat-box .stat-label { flex: 0 0 54px; text-align: right; font-family: 'Work Sans', sans-serif; font-size: 9px; color: #8A9689; white-space: nowrap; }
+  .stat-box input { flex: 0 1 42px; min-width: 0; border: none; text-align: right; font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: #20302B; background: transparent; }
+  .stat-box .unit { font-size: 9px; color: #8A9689; flex-shrink: 0; }
 
-  .field-label { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #5B6B63; margin-bottom: 8px; display: block; }
+  .field-label { font-family: 'Work Sans', sans-serif; font-size: 12.5px; color: #5B6B63; margin-bottom: 8px; display: block; }
 
   .cond-row { display: flex; gap: 6px; margin-bottom: 18px; }
   .cond-btn { flex: 1; padding: 8px 2px; border-radius: 8px; border: 1px solid #D7DED2; background: #fff; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -84,11 +82,12 @@
   .note-box { margin-bottom: 18px; }
   .note-box textarea { width: 100%; border: 1px solid #D7DED2; border-radius: 8px; padding: 9px 10px; font-size: 13.5px; font-family: inherit; resize: vertical; }
 
-  .exercise-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .exercise-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
   .exercise-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; border: 1px solid #D7DED2; background: #fff; cursor: pointer; font-size: 13px; color: #20302B; }
   .exercise-toggle.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; font-weight: 600; }
   .exercise-cal { display: flex; align-items: center; gap: 6px; }
-  .exercise-cal input { width: 80px; border: 1px solid #D7DED2; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; font-family: 'IBM Plex Mono', monospace; }
+  .exercise-cal input { width: 56px; border: 1px solid #D7DED2; border-radius: 8px; padding: 8px 10px; font-size: 13.5px; font-family: 'Work Sans', sans-serif; text-align: center; }
+  .exercise-cal input:disabled { background: #F0F2EB; color: #A9B3AC; cursor: not-allowed; }
   .exercise-cal span { font-size: 11.5px; color: #8A9689; }
 
   .action-row { display: flex; gap: 8px; }
@@ -107,23 +106,23 @@
 
   .empty-note { color: #6B7A70; font-size: 13.5px; padding: 24px 0; display: flex; align-items: center; gap: 8px; }
 
-  .bulk-open-btn { margin-top: 14px; width: 100%; background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 10px; padding: 11px 0; font-size: 13.5px; color: #20302B; cursor: pointer; }
+  .bulk-open-btn { background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 20px; padding: 6px 14px; font-size: 12px; color: #20302B; cursor: pointer; }
   .bulk-open-btn:hover { background: #F0F2EB; }
 
   .bulk-overlay { position: fixed; inset: 0; background: rgba(20,28,20,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 55; }
   .bulk-modal { background: #FDFCF8; border-radius: 16px; padding: 20px; width: 100%; max-width: 720px; max-height: 92vh; display: flex; flex-direction: column; animation: popIn 0.16s ease-out; }
   .bulk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-  .bulk-head .title { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 600; }
+  .bulk-head .title { font-family: 'Work Sans', sans-serif; font-size: 19px; font-weight: 600; }
   .bulk-range-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
   .bulk-load-btn { background: #7E8F3F; color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
   .bulk-table-wrap { overflow: auto; border: 1px solid #E1E6DC; border-radius: 10px; flex: 1; min-height: 0; }
   .bulk-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-  .bulk-table th { position: sticky; top: 0; background: #F3F5EE; text-align: left; padding: 8px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #5B6B63; border-bottom: 1px solid #E1E6DC; white-space: nowrap; }
+  .bulk-table th { position: sticky; top: 0; background: #F3F5EE; text-align: left; padding: 8px 6px; font-family: 'Work Sans', sans-serif; font-size: 11px; color: #5B6B63; border-bottom: 1px solid #E1E6DC; white-space: nowrap; }
   .bulk-table td { padding: 5px 6px; border-bottom: 1px solid #EEF0EA; vertical-align: middle; }
   .bulk-table tr.weekend-sun .date-cell { color: #C0392B; }
   .bulk-table tr.weekend-sat .date-cell { color: #2E5E8C; }
   .bulk-table .date-cell { font-family: 'IBM Plex Mono', monospace; white-space: nowrap; font-size: 12px; }
-  .bulk-table input[type="number"] { width: 64px; border: 1px solid #D7DED2; border-radius: 6px; padding: 5px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .bulk-table input[type="number"] { width: 64px; border: 1px solid #D7DED2; border-radius: 6px; padding: 5px 6px; font-family: 'Work Sans', sans-serif; font-size: 12px; }
   .bulk-table input[type="text"] { width: 130px; border: 1px solid #D7DED2; border-radius: 6px; padding: 5px 6px; font-size: 12px; font-family: inherit; }
   .bulk-cond-cell { display: flex; gap: 2px; }
   .bulk-cond-btn { border: 1px solid #D7DED2; background: #fff; border-radius: 6px; width: 24px; height: 24px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
@@ -140,7 +139,10 @@
 </head>
 <body>
   <div id="wrap">
-    <div class="eyebrow">DAILY LOG</div>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div class="eyebrow">DAILY LOG</div>
+      <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
+    </div>
 
     <div id="errorBox"></div>
 
@@ -155,8 +157,6 @@
     </div>
 
     <div class="legend" id="legend"></div>
-
-    <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
   </div>
 
   <div id="modalRoot"></div>
@@ -399,10 +399,8 @@
       var weekdayIdx = idx % 7;
       var classes = ["cal-cell"];
       if (iso === today) classes.push("today");
-      if (entry && entry.photo) classes.push("has-photo");
       if (weekdayIdx === 0) classes.push("sun");
       if (weekdayIdx === 6) classes.push("sat");
-      var bg = entry && entry.photo ? ' style="background-image:url(' + entry.photo + ')"' : "";
       var condEmojis = toConditionArray(entry && entry.condition).map(conditionEmoji).filter(Boolean);
       var statParts = [];
       if (entry && entry.weight) statParts.push(entry.weight);
@@ -414,9 +412,14 @@
         if (statParts.length) bottomRow += '<span class="stat-txt">' + escapeHtml(statParts.join(" · ")) + "</span>";
         bottomRow += "</span>";
       }
-      var exerciseRow = (entry && entry.exercised) ? '<span class="exercise-emoji">' + EXERCISE_EMOJI + "</span>" : "";
+      var exerciseRow = "";
+      if (entry && entry.exercised) {
+        exerciseRow = '<span class="bottom-row"><span class="exercise-emoji">' + EXERCISE_EMOJI + "</span>";
+        if (entry.exerciseCalories) exerciseRow += '<span class="stat-txt">' + escapeHtml(entry.exerciseCalories) + "</span>";
+        exerciseRow += "</span>";
+      }
       var stack = (exerciseRow || bottomRow) ? '<span class="stack">' + exerciseRow + bottomRow + "</span>" : "";
-      html += '<button class="' + classes.join(" ") + '"' + bg + ' data-date="' + iso + '">' +
+      html += '<button class="' + classes.join(" ") + '" data-date="' + iso + '">' +
         '<span class="day-num">' + day + "</span>" +
         stack +
         "</button>";
@@ -481,10 +484,16 @@
             '<div class="stat-col">' +
               '<div class="stat-box"><span class="stat-label" id="caloriesLabel">총 칼로리</span>' +
                 '<input type="number" inputmode="numeric" id="caloriesInput" placeholder="0" value="' +
-                  escapeHtml(existing.calories || "") + '" /></div>' +
-              '<div class="stat-box"><span class="stat-label">체중 (kg)</span>' +
+                  escapeHtml(existing.calories || "") + '" /><span class="unit">kcal</span></div>' +
+              '<div class="stat-box"><span class="stat-label">체중</span>' +
                 '<input type="number" inputmode="decimal" id="weightInput" placeholder="0" value="' +
-                  escapeHtml(existing.weight || "") + '" /></div>' +
+                  escapeHtml(existing.weight || "") + '" /><span class="unit">kg</span></div>' +
+              '<div class="stat-box"><span class="stat-label">허리 치수1</span>' +
+                '<input type="number" inputmode="decimal" id="waist1Input" placeholder="0" value="' +
+                  escapeHtml(existing.waist1 || "") + '" /><span class="unit">cm</span></div>' +
+              '<div class="stat-box"><span class="stat-label">허리 치수2</span>' +
+                '<input type="number" inputmode="decimal" id="waist2Input" placeholder="0" value="' +
+                  escapeHtml(existing.waist2 || "") + '" /><span class="unit">cm</span></div>' +
             '</div>' +
           '</div>' +
 
@@ -499,9 +508,9 @@
             '<button type="button" class="exercise-toggle' + (draft.exercised ? " active" : "") + '" id="exerciseToggleBtn">' +
               '<span>' + EXERCISE_EMOJI + '</span><span>운동함</span>' +
             '</button>' +
-            '<div class="exercise-cal" id="exerciseCalWrap" style="' + (draft.exercised ? "" : "display:none;") + '">' +
+            '<div class="exercise-cal">' +
               '<input type="number" inputmode="numeric" id="exerciseCaloriesInput" placeholder="0" value="' +
-                escapeHtml(existing.exerciseCalories || "") + '" /><span>kcal 소모</span>' +
+                escapeHtml(existing.exerciseCalories || "") + '"' + (draft.exercised ? "" : " disabled") + ' /><span>kcal 소모</span>' +
             '</div>' +
           '</div>' +
 
@@ -537,11 +546,11 @@
     });
     document.getElementById("closeModalBtn").addEventListener("click", closeModal);
 
-    // Exercise toggle: show/hide the burned-calories input alongside it.
+    // Exercise toggle: enable/disable the burned-calories input alongside it.
     document.getElementById("exerciseToggleBtn").addEventListener("click", function (e) {
       draft.exercised = !draft.exercised;
       e.currentTarget.classList.toggle("active", draft.exercised);
-      document.getElementById("exerciseCalWrap").style.display = draft.exercised ? "" : "none";
+      document.getElementById("exerciseCaloriesInput").disabled = !draft.exercised;
     });
 
     // Condition buttons: toggle without a full re-render. Multi-select.
@@ -658,8 +667,10 @@
       var calories = document.getElementById("caloriesInput").value.trim();
       var note = document.getElementById("noteInput").value.trim();
       var exerciseCalories = document.getElementById("exerciseCaloriesInput").value.trim();
+      var waist1 = document.getElementById("waist1Input").value.trim();
+      var waist2 = document.getElementById("waist2Input").value.trim();
 
-      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note && !draft.exercised) {
+      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note && !draft.exercised && !waist1 && !waist2) {
         showToast("사진이나 컨디션 중 하나는 기록해 주세요");
         return;
       }
@@ -675,6 +686,8 @@
         note: note,
         exercised: draft.exercised,
         exerciseCalories: draft.exercised ? exerciseCalories : "",
+        waist1: waist1,
+        waist2: waist2,
         existingPhotoFileId: draft.photoFileId || ""
       };
       if (draft.photoIsNew && draft.photo) payload.photoBase64 = draft.photo;
@@ -688,6 +701,8 @@
           note: note,
           exercised: draft.exercised,
           exerciseCalories: payload.exerciseCalories,
+          waist1: waist1,
+          waist2: waist2,
           photo: draft.removePhoto ? "" : (payload.photoBase64 ? draft.photo : (state.entries[iso] && state.entries[iso].photo) || ""),
           photoFileId: (res && res.photoFileId) || ""
         };
