@@ -196,6 +196,15 @@
   @media (max-width: 480px) {
     #wrap { padding: 14px 4px 24px; }
     .top-header-row { margin-bottom: 7px; padding: 0 6px; }
+    .top-header-row > div { gap: 5px; }
+    .bulk-open-btn { padding: 6px 8px; font-size: 11px; }
+
+    /* ~20% taller so more weekly rows fit before needing to scroll. */
+    .weekly-modal { min-height: 78vh; }
+
+    /* Not enough width for "체중 평균(kg)" etc. on one line — drop the
+       unit from the header only; the data cells still show it per value. */
+    .weekly-table .th-unit { display: none; }
 
     /* Drop the card surface entirely — background stays whatever the page
        already is — so the table itself can run edge to edge. */
@@ -1495,14 +1504,16 @@
       return;
     }
     var html = '<table class="weekly-table"><thead><tr>' +
-      "<th>주</th><th>체중 평균(kg)</th><th>칼로리 평균(kcal)</th><th>걸음수 평균(보)</th>" +
+      '<th>주</th><th>체중 평균<span class="th-unit">(kg)</span></th>' +
+      '<th>칼로리 평균<span class="th-unit">(kcal)</span></th>' +
+      '<th>걸음수 평균<span class="th-unit">(보)</span></th>' +
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
       html += "<tr>" +
         '<td class="week-label">' + r.label + "</td>" +
-        "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1)) + "</td>" +
-        "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg)) + "</td>" +
-        "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg)) + "</td>" +
+        "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + "kg") + "</td>" +
+        "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + "kcal") + "</td>" +
+        "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + "보") + "</td>" +
         "</tr>";
     });
     html += "</tbody></table>";
@@ -1608,12 +1619,14 @@
         '<div class="bulk-modal weekly-modal">' +
           '<div class="bulk-head">' +
             '<div class="title">주간 평균</div>' +
-            '<button class="bulk-close-btn" id="weeklyCloseBtn">✕</button>' +
+            '<div style="display:flex; gap:8px; align-items:center;">' +
+              '<button class="bulk-load-btn" id="weeklyMonthPickBtn">월 선택</button>' +
+              '<button class="bulk-close-btn" id="weeklyCloseBtn">✕</button>' +
+            '</div>' +
           '</div>' +
           '<div class="weekly-range-row">' +
             '<div class="fld"><label>시작일</label><input type="date" id="weeklyStart" value="' + range.startIso + '" /></div>' +
             '<div class="fld"><label>종료일</label><input type="date" id="weeklyEnd" value="' + range.endIso + '" /></div>' +
-            '<button class="bulk-load-btn" id="weeklyMonthPickBtn" style="margin-left:auto;">월 선택</button>' +
           '</div>' +
           '<div id="weeklyMonthTag" style="font-size:12px; color:#6B7A70; margin-bottom:10px;"></div>' +
           '<div id="weeklyTableBody"></div>' +
