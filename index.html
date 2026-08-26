@@ -195,6 +195,18 @@
     .exercise-cal input { font-size: 16px; width: 60px; }
     .note-box textarea { font-size: 16px; }
 
+    /* The 4 fields next to the photo (calories/weight/waist) were too
+       narrow and clipping text — give them much more of the row's width
+       at the photo's expense, and let the label sit closer to the edge
+       now that there's more room. */
+    .photo-slot { flex: 1; }
+    .stat-col { flex: 3; }
+    .stat-box { padding-left: 8px; }
+
+    /* The toast used to sit right over the modal's save/delete buttons on
+       phones — push it up above them instead. */
+    .toast { bottom: 90px; }
+
     /* Not enough width for icon + label on all three flag buttons at once —
        show just the emoji on mobile. */
     .exercise-toggle .flag-label { display: none; }
@@ -261,6 +273,16 @@
   function toConditionArray(c) {
     if (!c) return [];
     return Array.isArray(c) ? c : [c];
+  }
+
+  // Always display multiple condition emojis in the fixed CONDITION_LEVELS
+  // order, regardless of the order they were clicked in.
+  function sortConditionValues(arr) {
+    return arr.slice().sort(function (a, b) {
+      var ia = CONDITION_LEVELS.findIndex(function (l) { return l.value === a; });
+      var ib = CONDITION_LEVELS.findIndex(function (l) { return l.value === b; });
+      return ia - ib;
+    });
   }
 
   function pad2(n) { return String(n).padStart(2, "0"); }
@@ -514,7 +536,7 @@
       if (iso === today) classes.push("today");
       if (weekdayIdx === 0) classes.push("sun");
       if (weekdayIdx === 6) classes.push("sat");
-      var condEmojis = toConditionArray(entry && entry.condition).map(conditionEmoji).filter(Boolean);
+      var condEmojis = sortConditionValues(toConditionArray(entry && entry.condition)).map(conditionEmoji).filter(Boolean);
       var weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
       var caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
       var condTxt = condEmojis.length ? condEmojis.join("") : "";
@@ -786,6 +808,8 @@
 
     var deleteBtn = document.getElementById("deleteBtn");
     if (deleteBtn) deleteBtn.addEventListener("click", function () {
+      var ok = window.confirm(formatDateLong(iso) + " 기록을 삭제할까요?\n사진을 포함한 모든 내용이 삭제되며, 되돌릴 수 없어요.");
+      if (!ok) return;
       deleteBtn.disabled = true;
       deleteBtn.innerHTML = '<span class="spin">⟳</span> 삭제 중…';
       deleteEntryFromSheet(iso).then(function () {
