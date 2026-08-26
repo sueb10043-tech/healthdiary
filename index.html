@@ -43,6 +43,7 @@
   .cal-cell.sat .day-num { color: #2E5E8C; }
   .cal-cell.today .day-num { color: #4C5C2F; font-weight: 600; }
   .cal-cell .exercise-emoji { font-size: 10px; line-height: 1; }
+  .cal-cell .icon-group { display: flex; gap: 2px; }
   .cal-cell .data-stack { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .cal-cell .data-row { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: flex-start; overflow: hidden; }
   .cal-cell .cond-emoji { font-size: 10px; line-height: 1; }
@@ -62,9 +63,12 @@
 
   .photo-cal-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: flex-start; }
   .photo-slot { flex: 1; position: relative; min-width: 0; }
-  .photo-placeholder { width: 100%; height: 160px; border: 1.5px dashed #B7C2AF; border-radius: 10px; background: #F3F5EE; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #5B6B63; }
+  .photo-placeholder { width: 100%; height: 160px; border: 1.5px dashed #B7C2AF; border-radius: 10px; background: #F3F5EE; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #5B6B63; padding: 8px; }
+  .photo-placeholder-btn { background: transparent; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: inherit; cursor: pointer; flex: 1; width: 100%; }
   .photo-placeholder .icon { font-size: 17px; }
   .photo-placeholder .txt { font-size: 11px; }
+  .paste-catcher { width: 100%; max-width: 200px; border: 1px dashed #C9D0C7; border-radius: 6px; padding: 5px 8px; font-size: 16px; color: #8A9689; text-align: center; background: #fff; }
+  .paste-catcher::placeholder { color: #A9B3AC; }
   .photo-preview-wrap { position: relative; height: 160px; overflow: hidden; border-radius: 10px; border: 1px solid #D7DED2; background: #F3F5EE; }
   .photo-preview-wrap img { position: absolute; left: 0; bottom: 0; width: 100%; height: auto; display: block; cursor: zoom-in; }
   .photo-btn { position: absolute; background: rgba(32,48,43,0.72); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10.5px; }
@@ -88,7 +92,8 @@
   .note-box { margin-bottom: 18px; }
   .note-box textarea { width: 100%; border: 1px solid #D7DED2; border-radius: 8px; padding: 9px 10px; font-size: 13.5px; font-family: inherit; resize: vertical; }
 
-  .exercise-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .exercise-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .flag-right-group { display: flex; gap: 8px; margin-left: auto; }
   .exercise-toggle { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; border: 1px solid #D7DED2; background: #fff; cursor: pointer; font-size: 13px; color: #20302B; }
   .exercise-toggle.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; font-weight: 600; }
   .exercise-cal { display: flex; align-items: center; gap: 6px; }
@@ -221,7 +226,7 @@
     { value: "allergy", label: "알러지", emoji: "\uD83E\uDD22" }
   ];
   var WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-  var EXERCISE_EMOJI = "🏃"; // shown above the condition emoji row on days marked as exercised
+  var EXERCISE_EMOJI = "💪"; // shown next to the date number on days marked as exercised
   // Paste the Web App URL you get after deploying the Apps Script (Code.gs)
   // as a Web App. Looks like: https://script.google.com/macros/s/AKfycb.../exec
   var GAS_URL = "https://script.google.com/macros/s/AKfycby59a7FI0_Te-tuvEcUtpNUCt9j5G2i96ZW8AcJME3eA6ztoQpWFaraKw9h8FD8lqt4/exec";
@@ -253,6 +258,20 @@
     var d = new Date();
     return isoOf(d.getFullYear(), d.getMonth(), d.getDate());
   }
+  // Empty photo slot: a normal button for tapping to pick a file, plus a
+  // separate small text input purely so mobile browsers have something
+  // focusable to long-press and choose "Paste" on — phones have no Ctrl+V,
+  // so without a real editable target here, pasting an image never worked
+  // on mobile even though it worked fine on desktop.
+  function emptyPhotoPlaceholderHtml() {
+    return '<div class="photo-placeholder">' +
+      '<button type="button" class="photo-placeholder-btn" id="photoPlaceholderBtn">' +
+        '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
+      '</button>' +
+      '<input type="text" class="paste-catcher" id="pasteCatcherInput" placeholder="여기를 길게 눌러 붙여넣기" />' +
+    '</div>';
+  }
+
   function formatDateLong(iso) {
     var d = new Date(iso + "T00:00:00");
     return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + WEEKDAYS[d.getDay()] + ")";
@@ -488,10 +507,14 @@
       var weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
       var caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
       var condTxt = condEmojis.length ? condEmojis.join("") : "";
-      var exerciseIcon = (entry && entry.exercised) ? '<span class="exercise-emoji">' + EXERCISE_EMOJI + "</span>" : "<span></span>";
+      var flagIcons = "";
+      if (entry && entry.exercised) flagIcons += EXERCISE_EMOJI;
+      if (entry && entry.cheatDay) flagIcons += "🍔";
+      if (entry && entry.drinking) flagIcons += "🍺";
+      var leftIcons = flagIcons ? '<span class="icon-group exercise-emoji">' + flagIcons + "</span>" : "<span></span>";
 
       html += '<button class="' + classes.join(" ") + '" data-date="' + iso + '">' +
-        '<span class="top-row">' + exerciseIcon + '<span class="day-num">' + day + "</span></span>" +
+        '<span class="top-row">' + leftIcons + '<span class="day-num">' + day + "</span></span>" +
         '<span class="data-stack">' +
           '<span class="data-row"><span class="stat-txt">' + weightTxt + "</span></span>" +
           '<span class="data-row"><span class="stat-txt">' + caloriesTxt + "</span></span>" +
@@ -524,6 +547,8 @@
     draft.removePhoto = false;
     draft.condition = toConditionArray(existing.condition);
     draft.exercised = !!existing.exercised;
+    draft.cheatDay = !!existing.cheatDay;
+    draft.drinking = !!existing.drinking;
 
     var condButtons = CONDITION_LEVELS.map(function (lvl) {
       var active = draft.condition.indexOf(lvl.value) !== -1;
@@ -537,9 +562,7 @@
       ? '<div class="photo-preview-wrap"><img id="photoImg" src="' + draft.photo + '" alt="식단 사진" />' +
         '<button type="button" class="photo-btn remove" id="removePhotoBtn">✕</button>' +
         '<button type="button" class="photo-btn swap" id="swapPhotoBtn">사진 바꾸기</button></div>'
-      : '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
-        '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
-        '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+      : emptyPhotoPlaceholderHtml();
 
     var hasExisting = !!state.entries[iso];
 
@@ -581,11 +604,19 @@
 
           '<div class="exercise-row">' +
             '<button type="button" class="exercise-toggle' + (draft.exercised ? " active" : "") + '" id="exerciseToggleBtn">' +
-              '<span>' + EXERCISE_EMOJI + '</span><span>운동함</span>' +
+              '<span>' + EXERCISE_EMOJI + '</span><span>운동</span>' +
             '</button>' +
             '<div class="exercise-cal">' +
               '<input type="number" inputmode="numeric" id="exerciseCaloriesInput" placeholder="0" value="' +
                 escapeHtml(existing.exerciseCalories || "") + '"' + (draft.exercised ? "" : " disabled") + ' /><span>kcal 소모</span>' +
+            '</div>' +
+            '<div class="flag-right-group">' +
+              '<button type="button" class="exercise-toggle' + (draft.cheatDay ? " active" : "") + '" id="cheatToggleBtn">' +
+                '<span>🍔</span><span>치팅</span>' +
+              '</button>' +
+              '<button type="button" class="exercise-toggle' + (draft.drinking ? " active" : "") + '" id="drinkToggleBtn">' +
+                '<span>🍺</span><span>음주</span>' +
+              '</button>' +
             '</div>' +
           '</div>' +
 
@@ -621,11 +652,37 @@
     });
     document.getElementById("closeModalBtn").addEventListener("click", closeModal);
 
+    // Allow pasting a copied image straight into the photo slot while this
+    // popup is open. Defined early so it's already a real function (not
+    // null) by the time photo placeholders bind it below.
+    pasteHandler = function (e) {
+      var items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf("image/") === 0) {
+          var file = items[i].getAsFile();
+          if (file) handleIncomingImageFile(file);
+          break;
+        }
+      }
+    };
+    window.addEventListener("paste", pasteHandler);
+
     // Exercise toggle: enable/disable the burned-calories input alongside it.
     document.getElementById("exerciseToggleBtn").addEventListener("click", function (e) {
       draft.exercised = !draft.exercised;
       e.currentTarget.classList.toggle("active", draft.exercised);
       document.getElementById("exerciseCaloriesInput").disabled = !draft.exercised;
+    });
+
+    // Cheat day / drinking: simple on-off toggles, no extra fields attached.
+    document.getElementById("cheatToggleBtn").addEventListener("click", function (e) {
+      draft.cheatDay = !draft.cheatDay;
+      e.currentTarget.classList.toggle("active", draft.cheatDay);
+    });
+    document.getElementById("drinkToggleBtn").addEventListener("click", function (e) {
+      draft.drinking = !draft.drinking;
+      e.currentTarget.classList.toggle("active", draft.drinking);
     });
 
     // Condition buttons: toggle without a full re-render. Multi-select.
@@ -648,7 +705,12 @@
       var el = document.getElementById(elId);
       if (el) el.addEventListener("click", function () { document.getElementById("photoFileInput").click(); });
     }
+    function bindPasteCatcher() {
+      var catcher = document.getElementById("pasteCatcherInput");
+      if (catcher) catcher.addEventListener("paste", pasteHandler);
+    }
     bindPhotoInputTrigger("photoPlaceholderBtn");
+    bindPasteCatcher();
     bindPhotoInputTrigger("swapPhotoBtn");
 
     var removeBtn = document.getElementById("removePhotoBtn");
@@ -656,11 +718,9 @@
       draft.photo = null;
       draft.photoIsNew = false;
       if (draft.photoFileId) draft.removePhoto = true;
-      document.getElementById("photoSlot").innerHTML =
-        '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
-        '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
-        '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+      document.getElementById("photoSlot").innerHTML = emptyPhotoPlaceholderHtml();
       bindPhotoInputTrigger("photoPlaceholderBtn");
+      bindPasteCatcher();
     });
 
     function applyPhotoToSlot(dataUrl) {
@@ -677,10 +737,9 @@
         draft.photo = null;
         draft.photoIsNew = false;
         if (draft.photoFileId) draft.removePhoto = true;
-        slot.innerHTML = '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
-          '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
-          '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+        slot.innerHTML = emptyPhotoPlaceholderHtml();
         bindPhotoInputTrigger("photoPlaceholderBtn");
+        bindPasteCatcher();
       });
       bindPhotoInputTrigger("swapPhotoBtn");
     }
@@ -693,10 +752,9 @@
         applyPhotoToSlot(dataUrl);
       }).catch(function () {
         showToast("사진 처리에 실패했어요");
-        slot.innerHTML = '<button type="button" class="photo-placeholder" id="photoPlaceholderBtn">' +
-          '<span class="icon">📷</span><span class="txt">식단 사진 올리기</span>' +
-          '<span style="font-size:9.5px;color:#8A9689;">붙여넣기(Ctrl+V)도 가능</span></button>';
+        slot.innerHTML = emptyPhotoPlaceholderHtml();
         bindPhotoInputTrigger("photoPlaceholderBtn");
+        bindPasteCatcher();
       });
       runCalorieOcr(file);
     }
@@ -705,21 +763,6 @@
       var file = e.target.files && e.target.files[0];
       handleIncomingImageFile(file);
     });
-
-    // Allow pasting a copied image (Ctrl+V) straight into the photo slot
-    // while this popup is open.
-    pasteHandler = function (e) {
-      var items = e.clipboardData && e.clipboardData.items;
-      if (!items) return;
-      for (var i = 0; i < items.length; i++) {
-        if (items[i].type && items[i].type.indexOf("image/") === 0) {
-          var file = items[i].getAsFile();
-          if (file) handleIncomingImageFile(file);
-          break;
-        }
-      }
-    };
-    window.addEventListener("paste", pasteHandler);
 
     var deleteBtn = document.getElementById("deleteBtn");
     if (deleteBtn) deleteBtn.addEventListener("click", function () {
@@ -757,6 +800,8 @@
         note: note,
         exercised: draft.exercised,
         exerciseCalories: draft.exercised ? exerciseCalories : "",
+        cheatDay: draft.cheatDay,
+        drinking: draft.drinking,
         waist1: waist1,
         waist2: waist2,
         existingPhotoFileId: draft.photoFileId || ""
@@ -776,6 +821,8 @@
         note: note,
         exercised: draft.exercised,
         exerciseCalories: payload.exerciseCalories,
+        cheatDay: draft.cheatDay,
+        drinking: draft.drinking,
         waist1: waist1,
         waist2: waist2,
         photo: draft.removePhoto ? "" : (payload.photoBase64 ? draft.photo : (state.entries[iso] && state.entries[iso].photo) || ""),
@@ -805,6 +852,8 @@
   // month at once, instead of opening each day individually.
   var bulkRows = []; // iso dates for the currently loaded month
   var bulkDraft = {}; // date -> { weight, calories, condition:[], exercised, exerciseCalories, note }
+  var bulkOriginal = {}; // snapshot of the same shape, taken at load time — used to
+                          // detect which rows actually changed before saving
   var bulkViewYear = new Date().getFullYear();
   var bulkViewMonth = new Date().getMonth();
 
@@ -815,6 +864,8 @@
       condition: toConditionArray(existing && existing.condition).slice(),
       exercised: !!(existing && existing.exercised),
       exerciseCalories: (existing && existing.exerciseCalories) || "",
+      cheatDay: !!(existing && existing.cheatDay), // not shown in this view, but preserved on save
+      drinking: !!(existing && existing.drinking), // not shown in this view, but preserved on save
       note: (existing && existing.note) || "" // not shown in this view, but preserved on save
     };
   }
@@ -873,8 +924,10 @@
 
     bulkRows = dates;
     bulkDraft = {};
+    bulkOriginal = {};
     dates.forEach(function (iso) {
       bulkDraft[iso] = defaultBulkDraft(state.entries[iso]);
+      bulkOriginal[iso] = defaultBulkDraft(state.entries[iso]);
     });
     document.getElementById("bulkStatus").textContent = "기존 기록은 값이 채워져 있어요. 달을 이동하면 저장 안 한 입력은 사라져요.";
     renderBulkTable();
@@ -962,14 +1015,24 @@
     bindVerticalEnterNav(wrap, ".bulk-exercise-cal");
   }
 
-  function bulkDraftIsEmpty(d) {
-    return !d.weight && !d.calories && d.condition.length === 0 && !d.exercised;
+  // Only rows that actually differ from what was loaded need to be sent —
+  // otherwise every save re-writes the whole visible month, which is what
+  // made bulk saving slow.
+  function bulkDraftChanged(a, b) {
+    if (a.weight !== b.weight) return true;
+    if (a.calories !== b.calories) return true;
+    if (a.exercised !== b.exercised) return true;
+    if (a.exerciseCalories !== b.exerciseCalories) return true;
+    var ac = a.condition.slice().sort().join(",");
+    var bc = b.condition.slice().sort().join(",");
+    if (ac !== bc) return true;
+    return false;
   }
 
   function saveBulkAll() {
-    var toSave = bulkRows.filter(function (iso) { return !bulkDraftIsEmpty(bulkDraft[iso]); });
+    var toSave = bulkRows.filter(function (iso) { return bulkDraftChanged(bulkOriginal[iso], bulkDraft[iso]); });
     if (toSave.length === 0) {
-      document.getElementById("bulkStatus").textContent = "입력된 내용이 없어요.";
+      document.getElementById("bulkStatus").textContent = "변경된 내용이 없어요.";
       return;
     }
     var saveBtn = document.getElementById("bulkSaveBtn");
@@ -1003,6 +1066,8 @@
         note: d.note,
         exercised: d.exercised,
         exerciseCalories: d.exercised ? d.exerciseCalories : "",
+        cheatDay: d.cheatDay,
+        drinking: d.drinking,
         existingPhotoFileId: (state.entries[iso] && state.entries[iso].photoFileId) || ""
       };
       saveEntryToSheet(iso, payload).then(function (res) {
@@ -1013,9 +1078,14 @@
           note: d.note,
           exercised: d.exercised,
           exerciseCalories: payload.exerciseCalories,
+          cheatDay: d.cheatDay,
+          drinking: d.drinking,
           photo: (state.entries[iso] && state.entries[iso].photo) || "",
           photoFileId: (res && res.photoFileId) || (state.entries[iso] && state.entries[iso].photoFileId) || ""
         };
+        // So a second "전체 저장" click (without reopening this table)
+        // doesn't needlessly resend this row again.
+        bulkOriginal[iso] = defaultBulkDraft(state.entries[iso]);
         done++;
         saveNext(i + 1);
       }).catch(function () {
