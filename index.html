@@ -253,8 +253,6 @@
     /* "걸음수" is a short label, so it doesn't need the full reserved
        width the other rows' labels do — give that extra room to the
        number instead, since step counts commonly run to 5 digits. */
-    .stat-box.steps-row .stat-label { flex-basis: 34px; }
-    .stat-box.steps-row input { flex-basis: 64px; }
 
     /* The toast used to sit right over the modal's save/delete buttons on
        phones — push it up above them instead. */
@@ -687,7 +685,7 @@
               '<div class="stat-box"><span class="stat-label">허리 치수2</span>' +
                 '<input type="number" inputmode="decimal" id="waist2Input" placeholder="0" value="' +
                   escapeHtml(existing.waist2 || "") + '" /><span class="unit">cm</span></div>' +
-              '<div class="stat-box steps-row"><span class="stat-label">걸음수</span>' +
+              '<div class="stat-box"><span class="stat-label">걸음수</span>' +
                 '<input type="number" inputmode="numeric" id="stepsInput" placeholder="0" value="' +
                   escapeHtml(existing.steps || "") + '" /><span class="unit">보</span></div>' +
             '</div>' +
