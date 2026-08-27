@@ -382,14 +382,18 @@
   // and doPost/doGet on the Apps Script side JSON.parse the body regardless.
   function gasFetch(params, body) {
     var url = GAS_URL + (params ? "?" + params : "");
-    var opts = body
-      // keepalive tells the browser to finish sending this request even if
-      // the page is backgrounded/closed right after — which is exactly what
-      // happens a lot on mobile (tap save, immediately switch apps). Note:
-      // it only covers requests under ~64KB, so a save with a new photo
-      // attached is still at the mercy of the tab staying open a bit.
-      ? { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), keepalive: true }
-      : { method: "GET" };
+    var opts;
+    if (body) {
+      var bodyStr = JSON.stringify(body);
+      // keepalive helps a text-only save survive the page being backgrounded
+      // right after tapping save — but browsers hard-reject any keepalive
+      // request whose body is over ~64KB, which a photo upload easily is.
+      // Only turn it on when the payload is safely small.
+      var useKeepalive = bodyStr.length < 60000;
+      opts = { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: bodyStr, keepalive: useKeepalive };
+    } else {
+      opts = { method: "GET" };
+    }
     return fetch(url, opts).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
