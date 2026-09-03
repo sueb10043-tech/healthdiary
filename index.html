@@ -130,6 +130,9 @@
   .flag-legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .flag-legend .dot.cheat { background: #6E93B5; }
   .flag-legend .dot.drink { background: #CE7267; }
+  .photo-check-btn { margin-left: auto; background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 50%; width: 28px; height: 28px; font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .photo-check-btn.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; }
+  .cal-cell.no-photo-flag { background-color: #DCDFD3 !important; }
 
   .bulk-overlay { position: fixed; inset: 0; background: rgba(20,28,20,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 55; }
   .bulk-modal { background: #FDFCF8; border-radius: 16px; padding: 20px; width: 100%; max-width: 720px; max-height: 92vh; display: flex; flex-direction: column; animation: popIn 0.16s ease-out; }
@@ -291,6 +294,7 @@
     <div class="flag-legend">
       <span class="item"><span class="dot cheat"></span>치팅</span>
       <span class="item"><span class="dot drink"></span>음주</span>
+      <button type="button" id="photoCheckBtn" class="photo-check-btn" aria-label="사진 확인 모드" title="사진 확인 모드">📷</button>
     </div>
   </div>
 
@@ -322,6 +326,10 @@
     viewMonth: new Date().getMonth(),
     modalDate: null
   };
+
+  // When on, days with no saved photo get a gray background so they're
+  // easy to spot at a glance without opening each one.
+  var photoCheckMode = false;
 
   // Holds the in-progress edit for whichever date is open in the modal,
   // so typing doesn't force a full re-render (which would lose focus).
@@ -607,6 +615,7 @@
       if (iso === today) classes.push("today");
       if (weekdayIdx === 0) classes.push("sun");
       if (weekdayIdx === 6) classes.push("sat");
+      if (photoCheckMode && !(entry && entry.photo)) classes.push("no-photo-flag");
       var condEmojis = sortConditionValues(toConditionArray(entry && entry.condition)).map(conditionEmoji).filter(Boolean);
       var weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
       var caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
@@ -1686,6 +1695,12 @@
   }
 
   document.getElementById("weeklyAvgBtn").addEventListener("click", openWeeklyModal);
+
+  document.getElementById("photoCheckBtn").addEventListener("click", function () {
+    photoCheckMode = !photoCheckMode;
+    this.classList.toggle("active", photoCheckMode);
+    renderCalendar();
+  });
 
   document.getElementById("exportImageBtn").addEventListener("click", function () {
     // Give web fonts a moment to be ready so the canvas text renders with
