@@ -1083,7 +1083,7 @@
           '<td><div class="bulk-cond-cell">' + condBtns + '</div></td>' +
           '<td><div class="bulk-ex-cell">' +
             '<input type="checkbox" class="bulk-exercised" data-date="' + iso + '"' + (draft.exercised ? " checked" : "") + ' />' +
-            '<input type="number" inputmode="numeric" class="bulk-exercise-cal" data-date="' + iso + '" value="' + escapeHtml(draft.exerciseCalories) + '" placeholder="kcal" />' +
+            '<input type="number" inputmode="numeric" class="bulk-exercise-cal" data-date="' + iso + '" value="' + escapeHtml(draft.exerciseCalories) + '" placeholder="kcal"' + (draft.exercised ? "" : " disabled") + ' />' +
           '</div></td>' +
           '<td><input type="number" inputmode="numeric" class="bulk-steps" data-date="' + iso + '" value="' + escapeHtml(draft.steps) + '" placeholder="보" /></td>' +
         "</tr>"
@@ -1109,7 +1109,9 @@
       el.addEventListener("keydown", function (e) {
         if (e.key !== "Enter") return;
         e.preventDefault();
-        var next = inputs[i + 1];
+        var j = i + 1;
+        while (j < inputs.length && inputs[j].disabled) j++;
+        var next = inputs[j];
         if (next) { next.focus(); next.select(); }
       });
     });
@@ -1132,7 +1134,10 @@
     });
     Array.prototype.forEach.call(wrap.querySelectorAll(".bulk-exercised"), function (el) {
       el.addEventListener("change", function () {
-        bulkDraft[el.getAttribute("data-date")].exercised = el.checked;
+        var iso = el.getAttribute("data-date");
+        bulkDraft[iso].exercised = el.checked;
+        var calInput = wrap.querySelector('.bulk-exercise-cal[data-date="' + iso + '"]');
+        if (calInput) calInput.disabled = !el.checked;
       });
     });
     Array.prototype.forEach.call(wrap.querySelectorAll(".bulk-cond-btn"), function (btn) {
