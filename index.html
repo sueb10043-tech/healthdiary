@@ -209,9 +209,14 @@
     /* Not enough width for "체중 평균(kg)" etc. on one line — drop the
        unit from the header only; the data cells still show it per value. */
     .weekly-table .th-unit { display: none; }
+    .weekly-table .td-unit { display: none; }
+    .weekly-table .th-avg { display: none; }
     .weekly-table .wk-full { display: none; }
     .weekly-table .wk-short { display: inline; }
-    #weeklyTableBody { overflow-x: auto; }
+    #weeklyTableBody { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .weekly-table { width: 100%; font-size: 10.5px; table-layout: fixed; }
+    .weekly-table th, .weekly-table td { padding: 6px 3px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+    .weekly-modal .bulk-head .title { font-size: 16px; }
 
     /* Drop the card surface entirely — background stays whatever the page
        already is — so the table itself can run edge to edge. */
@@ -1477,7 +1482,7 @@
       rows.push({
         weekKey: isoOf(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()),
         label: fmtWeekDate(weekStart) + " ~ " + fmtWeekDate(weekEnd),
-        labelShort: fmtWeekDateShort(weekStart) + " ~ " + fmtWeekDateShort(weekEnd),
+        labelShort: fmtWeekDateShort(weekStart) + "~" + fmtWeekDateShort(weekEnd),
         weightAvg: average(weights),
         caloriesAvg: average(calories),
         stepsAvg: average(steps),
@@ -1552,17 +1557,17 @@
       return;
     }
     var html = '<table class="weekly-table"><thead><tr>' +
-      '<th>주</th><th>체중 평균<span class="th-unit">(kg)</span></th>' +
-      '<th>칼로리 평균<span class="th-unit">(kcal)</span></th>' +
-      '<th>걸음수 평균<span class="th-unit">(보)</span></th>' +
+      '<th>주</th><th>체중<span class="th-avg"> 평균</span><span class="th-unit">(kg)</span></th>' +
+      '<th>칼로리<span class="th-avg"> 평균</span><span class="th-unit">(kcal)</span></th>' +
+      '<th>걸음수<span class="th-avg"> 평균</span><span class="th-unit">(보)</span></th>' +
       '<th>치팅</th><th>음주</th>' +
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
       html += "<tr>" +
         '<td class="week-label"><span class="wk-full">' + r.label + '</span><span class="wk-short">' + r.labelShort + "</span></td>" +
-        "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + "kg") + "</td>" +
-        "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + "kcal") + "</td>" +
-        "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + "보") + "</td>" +
+        "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + '<span class="td-unit">kg</span>') + "</td>" +
+        "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + '<span class="td-unit">kcal</span>') + "</td>" +
+        "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + '<span class="td-unit">보</span>') + "</td>" +
         "<td>" + (r.cheatCount === 0 ? "-" : r.cheatCount + "회") + "</td>" +
         "<td>" + (r.drinkCount === 0 ? "-" : r.drinkCount + "회") + "</td>" +
         "</tr>";
