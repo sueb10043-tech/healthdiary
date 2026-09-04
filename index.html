@@ -1459,6 +1459,7 @@
       weekEnd.setDate(weekStart.getDate() + 6);
 
       var weights = [], calories = [], steps = [];
+      var cheatCount = 0, drinkCount = 0;
       var cursor = new Date(weekStart);
       for (var i = 0; i < 7; i++) {
         var iso = isoOf(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
@@ -1467,6 +1468,8 @@
           if (entry.weight && !isNaN(parseFloat(entry.weight))) weights.push(parseFloat(entry.weight));
           if (entry.calories && !isNaN(parseFloat(entry.calories))) calories.push(parseFloat(entry.calories));
           if (entry.steps && !isNaN(parseFloat(entry.steps))) steps.push(parseFloat(entry.steps));
+          if (entry.cheatDay) cheatCount++;
+          if (entry.drinking) drinkCount++;
         }
         cursor.setDate(cursor.getDate() + 1);
       }
@@ -1477,7 +1480,9 @@
         labelShort: fmtWeekDateShort(weekStart) + " ~ " + fmtWeekDateShort(weekEnd),
         weightAvg: average(weights),
         caloriesAvg: average(calories),
-        stepsAvg: average(steps)
+        stepsAvg: average(steps),
+        cheatCount: cheatCount,
+        drinkCount: drinkCount
       });
 
       weekStart = new Date(weekStart);
@@ -1550,6 +1555,7 @@
       '<th>주</th><th>체중 평균<span class="th-unit">(kg)</span></th>' +
       '<th>칼로리 평균<span class="th-unit">(kcal)</span></th>' +
       '<th>걸음수 평균<span class="th-unit">(보)</span></th>' +
+      '<th>치팅/음주</th>' +
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
       html += "<tr>" +
@@ -1557,6 +1563,7 @@
         "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + "kg") + "</td>" +
         "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + "kcal") + "</td>" +
         "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + "보") + "</td>" +
+        "<td>치팅 " + r.cheatCount + " · 음주 " + r.drinkCount + "</td>" +
         "</tr>";
     });
     html += "</tbody></table>";
