@@ -1563,8 +1563,8 @@
         "<td>" + (r.weightAvg === null ? "-" : r.weightAvg.toFixed(1) + "kg") + "</td>" +
         "<td>" + (r.caloriesAvg === null ? "-" : Math.round(r.caloriesAvg) + "kcal") + "</td>" +
         "<td>" + (r.stepsAvg === null ? "-" : Math.round(r.stepsAvg) + "보") + "</td>" +
-        "<td>" + r.cheatCount + "회</td>" +
-        "<td>" + r.drinkCount + "회</td>" +
+        "<td>" + (r.cheatCount === 0 ? "-" : r.cheatCount + "회") + "</td>" +
+        "<td>" + (r.drinkCount === 0 ? "-" : r.drinkCount + "회") + "</td>" +
         "</tr>";
     });
     html += "</tbody></table>";
