@@ -130,10 +130,10 @@
   .flag-legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .flag-legend .dot.cheat { background: #6E93B5; }
   .flag-legend .dot.drink { background: #CE7267; }
-  .photo-check-btn { margin-left: auto; background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 50%; width: 28px; height: 28px; font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .photo-check-btn { background: #FDFCF8; border: 1px solid #D7DED2; border-radius: 50%; width: 28px; height: 28px; font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .photo-check-btn.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; }
   .cal-cell.no-photo-flag { background-color: #DCDFD3 !important; }
-  .cal-cell.period-flag { background-color: #F6DAE1; }
+  .cal-cell.period-flag { background-color: #FBEBF0; }
 
   .bulk-overlay { position: fixed; inset: 0; background: rgba(20,28,20,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 55; }
   .bulk-modal { background: #FDFCF8; border-radius: 16px; padding: 20px; width: 100%; max-width: 720px; max-height: 92vh; display: flex; flex-direction: column; animation: popIn 0.16s ease-out; }
@@ -306,12 +306,13 @@
     <div class="flag-legend">
       <span class="item"><span class="dot cheat"></span>치팅</span>
       <span class="item"><span class="dot drink"></span>음주</span>
-      <button type="button" id="periodBtn" class="photo-check-btn" aria-label="생리 기간 설정" title="생리 기간 설정">🌸</button>
-      <button type="button" id="photoCheckBtn" class="photo-check-btn" aria-label="사진 확인 모드" title="사진 확인 모드">📷</button>
+      <div style="display:flex; gap:6px; margin-left:auto;">
+        <button type="button" id="periodBtn" class="photo-check-btn" aria-label="생리 기간 설정" title="생리 기간 설정">🌸</button>
+        <button type="button" id="photoCheckBtn" class="photo-check-btn" aria-label="사진 확인 모드" title="사진 확인 모드">📷</button>
+      </div>
     </div>
   </div>
 
-  <div id="periodModalRoot"></div>
   <div id="modalRoot"></div>
   <div id="bulkModalRoot"></div>
   <div id="weeklyModalRoot"></div>
@@ -344,6 +345,10 @@
   // When on, days with no saved photo get a gray background so they're
   // easy to spot at a glance without opening each one.
   var photoCheckMode = false;
+
+  // When on, tapping a calendar day toggles its 생리 (period) flag directly
+  // instead of opening the day's edit popup.
+  var periodEditMode = false;
 
   // Holds the in-progress edit for whichever date is open in the modal,
   // so typing doesn't force a full re-render (which would lose focus).
@@ -655,7 +660,11 @@
     document.getElementById("calGrid").innerHTML = html;
 
     Array.prototype.forEach.call(document.querySelectorAll("#calGrid .cal-cell"), function (btn) {
-      btn.addEventListener("click", function () { openModal(btn.getAttribute("data-date")); });
+      btn.addEventListener("click", function () {
+        var iso = btn.getAttribute("data-date");
+        if (periodEditMode) { togglePeriodForDate(iso, btn); return; }
+        openModal(iso);
+      });
     });
   }
 
@@ -1734,113 +1743,47 @@
     renderCalendar();
   });
 
-  // ---- period (menstrual) range marking -----------------------------------
-  function isoRangeList(startIso, endIso) {
-    var out = [];
-    var cur = new Date(startIso + "T00:00:00");
-    var end = new Date(endIso + "T00:00:00");
-    if (isNaN(cur) || isNaN(end) || cur > end) return out;
-    var guard = 0;
-    while (cur <= end && guard < 93) {
-      out.push(isoOf(cur.getFullYear(), cur.getMonth(), cur.getDate()));
-      cur.setDate(cur.getDate() + 1);
-      guard++;
-    }
-    return out;
-  }
+  // ---- period (menstrual) tap-to-toggle mode ------------------------------
+  function togglePeriodForDate(iso, cellEl) {
+    var existing = state.entries[iso] || {};
+    var newValue = !existing.period;
 
-  function applyPeriodToRange(startIso, endIso, value) {
-    var dates = isoRangeList(startIso, endIso);
-    var status = document.getElementById("periodStatus");
-    if (dates.length === 0) {
-      if (status) status.textContent = "시작일이 종료일보다 앞서야 해요.";
-      return;
-    }
-    var applyBtns = document.querySelectorAll(".period-apply-btn");
-    applyBtns.forEach(function (b) { b.disabled = true; });
+    // Optimistic UI: flip the cell's color immediately, save in background.
+    cellEl.classList.toggle("period-flag", newValue);
+    state.entries[iso] = Object.assign({}, existing, { period: newValue });
+
+    var payload = {
+      weight: existing.weight || "",
+      calories: existing.calories || "",
+      condition: toConditionArray(existing.condition),
+      note: existing.note || "",
+      exercised: !!existing.exercised,
+      exerciseCalories: existing.exerciseCalories || "",
+      cheatDay: !!existing.cheatDay,
+      drinking: !!existing.drinking,
+      waist1: existing.waist1 || "",
+      waist2: existing.waist2 || "",
+      steps: existing.steps || "",
+      period: newValue,
+      existingPhotoFileId: existing.photoFileId || ""
+    };
     setSaveStatus("saving");
-    var done = 0;
-
-    function next(i) {
-      if (i >= dates.length) {
-        applyBtns.forEach(function (b) { b.disabled = false; });
-        setSaveStatus("success");
-        showToast(dates.length + "일 반영 완료");
-        renderCalendar();
-        return;
+    saveEntryToSheet(iso, payload).then(function (res) {
+      if (state.entries[iso]) {
+        state.entries[iso].photoFileId = (res && res.photoFileId) || state.entries[iso].photoFileId || "";
       }
-      var iso = dates[i];
-      var existing = state.entries[iso] || {};
-      var payload = {
-        weight: existing.weight || "",
-        calories: existing.calories || "",
-        condition: toConditionArray(existing.condition),
-        note: existing.note || "",
-        exercised: !!existing.exercised,
-        exerciseCalories: existing.exerciseCalories || "",
-        cheatDay: !!existing.cheatDay,
-        drinking: !!existing.drinking,
-        waist1: existing.waist1 || "",
-        waist2: existing.waist2 || "",
-        steps: existing.steps || "",
-        period: value,
-        existingPhotoFileId: existing.photoFileId || ""
-      };
-      if (status) status.textContent = "반영 중… (" + (i + 1) + "/" + dates.length + ")";
-      saveEntryToSheet(iso, payload).then(function (res) {
-        state.entries[iso] = Object.assign({}, existing, {
-          period: value,
-          photoFileId: (res && res.photoFileId) || existing.photoFileId || ""
-        });
-        done++;
-        next(i + 1);
-      }).catch(function () {
-        setSaveStatus("error");
-        showToast(iso + " 반영 실패 — 인터넷 연결을 확인해주세요");
-        applyBtns.forEach(function (b) { b.disabled = false; });
-      });
-    }
-    next(0);
-  }
-
-  function openPeriodModal() {
-    var today = todayStr();
-    document.getElementById("periodModalRoot").innerHTML =
-      '<div class="bulk-overlay" id="periodOverlay">' +
-        '<div class="bulk-modal" style="max-width:360px;">' +
-          '<div class="bulk-head">' +
-            '<div class="title">🌸 생리 기간</div>' +
-            '<button class="bulk-close-btn" id="periodCloseBtn">✕</button>' +
-          '</div>' +
-          '<div class="weekly-range-row">' +
-            '<div class="fld"><label>시작일</label><input type="date" id="periodStart" value="' + today + '" /></div>' +
-            '<div class="fld"><label>종료일</label><input type="date" id="periodEnd" value="' + today + '" /></div>' +
-          '</div>' +
-          '<div id="periodStatus" style="font-size:12px; color:#6B7A70; margin-bottom:14px;"></div>' +
-          '<div style="display:flex; gap:8px;">' +
-            '<button class="bulk-save-btn period-apply-btn" id="periodOnBtn">표시 켜기</button>' +
-            '<button class="del-btn period-apply-btn" id="periodOffBtn">표시 끄기</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-
-    document.getElementById("periodOverlay").addEventListener("click", function (e) {
-      if (e.target.id === "periodOverlay") closePeriodModal();
-    });
-    document.getElementById("periodCloseBtn").addEventListener("click", closePeriodModal);
-    document.getElementById("periodOnBtn").addEventListener("click", function () {
-      applyPeriodToRange(document.getElementById("periodStart").value, document.getElementById("periodEnd").value, true);
-    });
-    document.getElementById("periodOffBtn").addEventListener("click", function () {
-      applyPeriodToRange(document.getElementById("periodStart").value, document.getElementById("periodEnd").value, false);
+      setSaveStatus("success");
+    }).catch(function () {
+      setSaveStatus("error");
+      showToast(iso + " 저장 실패 — 인터넷 연결을 확인해주세요");
     });
   }
 
-  function closePeriodModal() {
-    document.getElementById("periodModalRoot").innerHTML = "";
-  }
-
-  document.getElementById("periodBtn").addEventListener("click", openPeriodModal);
+  document.getElementById("periodBtn").addEventListener("click", function () {
+    periodEditMode = !periodEditMode;
+    this.classList.toggle("active", periodEditMode);
+    showToast(periodEditMode ? "생리 입력 모드 — 날짜를 눌러 표시/해제하세요" : "생리 입력 모드 종료");
+  });
 
   document.getElementById("exportImageBtn").addEventListener("click", function () {
     // Give web fonts a moment to be ready so the canvas text renders with
