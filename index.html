@@ -212,6 +212,7 @@
     #weeklyTableBody { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .weekly-table .wk-full { display: none; }
     .weekly-table .wk-short { display: inline; }
+    .weekly-table .th-unit { display: none; }
     .weekly-table { width: 100%; font-size: 10.5px; table-layout: fixed; }
     /* table-layout:fixed divides columns equally by default — give the
        short "치팅"/"음주" columns just enough room, and hand the rest to
@@ -448,11 +449,14 @@
     }
   }
 
+  // Resolves to the entries object on success, or null on failure — null
+  // (not {}) so the caller can tell "load failed" apart from "sheet is
+  // empty" and keep showing the cached calendar instead of wiping it.
   function loadAllEntries() {
     if (!GAS_URL || GAS_URL.indexOf("PASTE_YOUR") === 0) {
       document.getElementById("errorBox").innerHTML =
         '<div class="error-box">Google Sheets 연결 주소(GAS_URL)가 아직 설정되지 않았어요. 코드 상단의 GAS_URL 값을 배포한 웹앱 주소로 바꿔주세요.</div>';
-      return Promise.resolve({});
+      return Promise.resolve(null);
     }
     return gasFetch("action=list").then(function (res) {
       if (!res || !res.ok) throw new Error((res && res.error) || "list failed");
@@ -460,7 +464,7 @@
     }).catch(function (err) {
       document.getElementById("errorBox").innerHTML =
         '<div class="error-box">기록을 불러오지 못했어요. 인터넷 연결과 Google Sheets 연결 주소를 확인해주세요.</div>';
-      return {};
+      return null;
     });
   }
 
@@ -1276,12 +1280,16 @@
   // ---- month-as-image export ---------------------------------------------
   // Draws a plain text/number table (no emoji or color-only signals) so an
   // AI reading the image later can parse every value unambiguously.
+  // Exception: period days get the date cell filled pink, matching the
+  // calendar's period color.
   var CONDITION_EXPORT_LABELS = {
     success2: "정상 배변",
     success: "단단한 변",
     uncomfortable: "복부 가스",
     allergy: "알러지"
   };
+
+  var PERIOD_COLOR = "#FBEBF0"; // same as .cal-cell.period-flag
 
   var EXPORT_COLUMNS = [
     { key: "date", label: "날짜", width: 62 },
@@ -1359,6 +1367,12 @@
         ctx.fillStyle = "#F7F8F4";
         ctx.fillRect(startX, y, tableW, rowH);
       }
+      // Period day: fill just the date cell pink (drawn after the stripe so
+      // it looks the same on odd and even rows).
+      if (e.period) {
+        ctx.fillStyle = PERIOD_COLOR;
+        ctx.fillRect(startX, y, EXPORT_COLUMNS[0].width, rowH);
+      }
       var cx = startX;
       EXPORT_COLUMNS.forEach(function (col) {
         ctx.fillStyle = col.key === "date"
@@ -1414,7 +1428,8 @@
         waist2: entry.waist2 || "",
         steps: entry.steps || "",
         cheat: !!entry.cheatDay,
-        drink: !!entry.drinking
+        drink: !!entry.drinking,
+        period: !!entry.period
       });
     }
     var canvas = drawMonthTableCanvas(rows, state.viewYear, state.viewMonth);
@@ -1818,7 +1833,10 @@
 
   // Refresh from Google Sheets in the background. The calendar is already
   // interactive by this point, so this no longer blocks anything.
+  // null means the load failed — keep the cached calendar on screen and
+  // leave the cache untouched instead of wiping both with an empty result.
   loadAllEntries().then(function (entries) {
+    if (entries === null) return;
     state.entries = entries;
     renderCalendar();
     saveCachedEntries(entries);
