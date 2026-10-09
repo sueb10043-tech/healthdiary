@@ -408,7 +408,9 @@
   // ---- storage (Google Sheets via Apps Script Web App) -------------------
   // text/plain avoids a CORS preflight (Apps Script doesn't handle OPTIONS),
   // and doPost/doGet on the Apps Script side JSON.parse the body regardless.
-  function gasFetch(params, body) {
+  // timeoutMs: give up instead of hanging forever on a stalled mobile
+  // connection — the save queue below then retries.
+  function gasFetch(params, body, timeoutMs) {
     var url = GAS_URL + (params ? "?" + params : "");
     var opts;
     if (body) {
@@ -422,9 +424,17 @@
     } else {
       opts = { method: "GET" };
     }
+    var timer = null;
+    if (timeoutMs && typeof AbortController !== "undefined") {
+      var ctrl = new AbortController();
+      opts.signal = ctrl.signal;
+      timer = setTimeout(function () { ctrl.abort(); }, timeoutMs);
+    }
     return fetch(url, opts).then(function (res) {
       if (!res.ok) throw new Error("HTTP " + res.status);
       return res.json();
+    }).finally(function () {
+      if (timer) clearTimeout(timer);
     });
   }
 
@@ -441,9 +451,22 @@
       return null;
     }
   }
+  // Called on load AND after every local change (save, delete, period
+  // toggle), so the cache never lags behind what's on screen. Freshly
+  // picked photos (big data: URLs) are left out to keep the cache small —
+  // they're swapped for the Drive thumbnail on the next load anyway.
   function saveCachedEntries(entries) {
     try {
-      localStorage.setItem(ENTRY_CACHE_KEY, JSON.stringify(entries));
+      var slim = {};
+      Object.keys(entries).forEach(function (k) {
+        var e = entries[k];
+        if (e && e.photo && String(e.photo).indexOf("data:") === 0) {
+          slim[k] = Object.assign({}, e, { photo: "" });
+        } else {
+          slim[k] = e;
+        }
+      });
+      localStorage.setItem(ENTRY_CACHE_KEY, JSON.stringify(slim));
     } catch (e) {
       /* storage full or unavailable — safe to ignore, caching is optional */
     }
@@ -469,20 +492,148 @@
   }
 
   function saveEntryToSheet(dateIso, payload) {
-    payload.action = "save";
-    payload.date = dateIso;
-    return gasFetch(null, payload).then(function (res) {
+    var body = Object.assign({}, payload, { action: "save", date: dateIso });
+    // Photo uploads go through Drive and take longer — give them more time.
+    var timeout = body.photoBase64 ? 90000 : 40000;
+    return gasFetch(null, body, timeout).then(function (res) {
       if (!res || !res.ok) throw new Error((res && res.error) || "save failed");
       return res;
     });
   }
 
   function deleteEntryFromSheet(dateIso) {
-    return gasFetch(null, { action: "delete", date: dateIso }).then(function (res) {
+    return gasFetch(null, { action: "delete", date: dateIso }, 40000).then(function (res) {
       if (!res || !res.ok) throw new Error((res && res.error) || "delete failed");
       return res;
     });
   }
+
+  // ---- save queue (outbox) -------------------------------------------------
+  // Every save/delete goes into a small queue kept in localStorage and is
+  // sent one at a time, with automatic retries. This fixes three things:
+  //  - a save no longer silently disappears when the connection drops or
+  //    the app is closed mid-upload — it's retried on the next open;
+  //  - two saves for the same day can't land in the wrong order;
+  //  - several quick edits to the same day collapse into one request.
+  var OUTBOX_KEY = "dietlog_outbox_v1";
+  var outbox = {}; // date -> { op: "save" | "delete", payload, seq }
+  var outboxSeq = 0;
+  var outboxRunning = false;
+  var outboxRetryTimer = null;
+  var outboxInError = false; // so a long outage shows the failure toast once, not every minute
+  var localEditedAt = {}; // date -> time of last local change
+
+  try {
+    var rawOutbox = localStorage.getItem(OUTBOX_KEY);
+    if (rawOutbox) outbox = JSON.parse(rawOutbox) || {};
+  } catch (e) { outbox = {}; }
+  Object.keys(outbox).forEach(function (k) { outboxSeq = Math.max(outboxSeq, outbox[k].seq || 0); });
+
+  function persistOutbox() {
+    try {
+      localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox));
+    } catch (e) {
+      // Usually a photo too big for storage — keep the queue in memory only.
+    }
+  }
+
+  function outboxSize() { return Object.keys(outbox).length; }
+
+  // A newer save for a date that still has an unsent one must not drop the
+  // unsent one's photo change (e.g. new photo saved, then 🌸 tapped before
+  // the upload went through).
+  function mergeSavePayload(prev, next) {
+    var oldId = prev.existingPhotoFileId || "";
+    if (!next.photoBase64 && !next.removePhoto) {
+      if (prev.photoBase64) next.photoBase64 = prev.photoBase64;
+      else if (prev.removePhoto) next.removePhoto = true;
+    }
+    if (!next.existingPhotoFileId && oldId && (next.photoBase64 || next.removePhoto)) {
+      next.existingPhotoFileId = oldId;
+    }
+    return next;
+  }
+
+  function enqueueOp(date, op, payload) {
+    var prev = outbox[date];
+    if (op === "save" && prev && prev.op === "save") payload = mergeSavePayload(prev.payload, payload);
+    outbox[date] = { op: op, payload: payload || null, seq: ++outboxSeq };
+    localEditedAt[date] = Date.now();
+    persistOutbox();
+    saveCachedEntries(state.entries);
+    processOutbox();
+  }
+  function enqueueSave(date, payload) { enqueueOp(date, "save", payload); }
+  function enqueueDelete(date) { enqueueOp(date, "delete", null); }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function sendWithRetry(date, item) {
+    var delays = [0, 2000, 5000];
+    var attempt = 0;
+    function tryOnce() {
+      var p = item.op === "delete" ? deleteEntryFromSheet(date) : saveEntryToSheet(date, item.payload);
+      return p.catch(function (err) {
+        attempt++;
+        if (attempt >= delays.length) throw err;
+        return sleep(delays[attempt]).then(tryOnce);
+      });
+    }
+    return tryOnce();
+  }
+
+  function processOutbox() {
+    if (outboxRunning) return;
+    clearTimeout(outboxRetryTimer);
+    var dates = Object.keys(outbox);
+    if (dates.length === 0) {
+      return;
+    }
+    outboxRunning = true;
+    setSaveStatus("saving");
+    var date = dates[0];
+    var item = outbox[date];
+
+    sendWithRetry(date, item).then(function (res) {
+      var returnedId = (res && res.photoFileId) || "";
+      if (item.op === "save" && state.entries[date]) state.entries[date].photoFileId = returnedId;
+
+      var current = outbox[date];
+      if (current && current.seq === item.seq) {
+        delete outbox[date];
+      } else if (current && current.op === "save" && item.op === "save") {
+        // A newer edit for this day arrived while this one was in flight.
+        // The photo has now been uploaded, so don't upload it a second time.
+        if (current.payload.photoBase64 && current.payload.photoBase64 === item.payload.photoBase64) {
+          delete current.payload.photoBase64;
+        }
+        if (current.payload.removePhoto && item.payload.removePhoto) delete current.payload.removePhoto;
+        current.payload.existingPhotoFileId = returnedId;
+      }
+      persistOutbox();
+      saveCachedEntries(state.entries);
+      outboxRunning = false;
+      outboxInError = false;
+      if (outboxSize() === 0) {
+        setSaveStatus("success");
+      } else {
+        processOutbox();
+      }
+    }).catch(function (err) {
+      outboxRunning = false;
+      setSaveStatus("error");
+      if (!outboxInError) showToast("저장 실패 — 연결되면 자동으로 다시 저장해요");
+      outboxInError = true;
+      outboxRetryTimer = setTimeout(processOutbox, 60000);
+    });
+  }
+
+  // Try again right away when the connection comes back or the app is
+  // brought back to the foreground.
+  window.addEventListener("online", processOutbox);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && outboxSize() > 0) processOutbox();
+  });
 
   // ---- image compression --------------------------------------------
   function fileToCompressedDataUrl(file, maxSize, quality) {
@@ -920,18 +1071,12 @@
     if (deleteBtn) deleteBtn.addEventListener("click", function () {
       var ok = window.confirm(formatDateLong(iso) + " 기록을 삭제할까요?\n사진을 포함한 모든 내용이 삭제되며, 되돌릴 수 없어요.");
       if (!ok) return;
-      deleteBtn.disabled = true;
-      deleteBtn.innerHTML = '<span class="spin">⟳</span> 삭제 중…';
-      deleteEntryFromSheet(iso).then(function () {
-        delete state.entries[iso];
-        showToast("삭제했어요");
-        closeModal();
-        renderCalendar();
-      }).catch(function () {
-        showToast("삭제에 실패했어요. 인터넷 연결을 확인해주세요");
-        deleteBtn.disabled = false;
-        deleteBtn.innerHTML = "🗑 삭제";
-      });
+      // Same as saving: remove it on screen right away and let the save
+      // queue send the delete (with retries) in the background.
+      delete state.entries[iso];
+      closeModal();
+      renderCalendar();
+      enqueueDelete(iso);
     });
 
     document.getElementById("saveBtn").addEventListener("click", function () {
@@ -968,9 +1113,8 @@
 
       // Update the local view and close the popup right away instead of
       // making the person wait on the network round trip (Drive upload +
-      // sheet write). The actual confirmation — a toast either way — only
-      // shows once the request truly finishes, even though it may pop up
-      // after they've already moved on to something else in the app.
+      // sheet write). The save queue sends it in the background and the
+      // dot next to "DAILY LOG" shows how it went.
       state.entries[iso] = {
         weight: weight,
         calories: calories,
@@ -985,24 +1129,13 @@
         steps: steps,
         period: payload.period,
         photo: draft.removePhoto ? "" : (payload.photoBase64 ? draft.photo : (state.entries[iso] && state.entries[iso].photo) || ""),
-        photoFileId: draft.photoFileId || ""
+        // A removed photo no longer has a Drive file to point at — keeping
+        // the old id here made a later 🌸 tap quietly bring the photo back.
+        photoFileId: draft.removePhoto ? "" : (draft.photoFileId || "")
       };
       closeModal();
       renderCalendar();
-      setSaveStatus("saving");
-
-      saveEntryToSheet(iso, payload).then(function (res) {
-        if (state.entries[iso]) {
-          state.entries[iso].photoFileId = (res && res.photoFileId) || state.entries[iso].photoFileId || "";
-        }
-        setSaveStatus("success");
-        // Note: we skip re-fetching the whole sheet here on purpose — the
-        // photo shown right after saving is the local preview; it'll switch
-        // to the permanent Drive link the next time the page loads.
-      }).catch(function () {
-        setSaveStatus("error");
-        showToast(formatDateLong(iso) + " 저장 실패 — 인터넷 연결을 확인하고 다시 시도해주세요");
-      });
+      enqueueSave(iso, payload);
     });
   }
 
@@ -1208,30 +1341,11 @@
       document.getElementById("bulkStatus").textContent = "변경된 내용이 없어요.";
       return;
     }
-    var saveBtn = document.getElementById("bulkSaveBtn");
-    var status = document.getElementById("bulkStatus");
-    saveBtn.disabled = true;
-    setSaveStatus("saving");
-    var done = 0;
-    var failed = [];
-
-    function saveNext(i) {
-      if (i >= toSave.length) {
-        saveBtn.disabled = false;
-        if (failed.length === 0) {
-          setSaveStatus("success");
-          showToast(done + "일 저장 완료");
-          closeBulkModal();
-          renderCalendar();
-        } else {
-          setSaveStatus("error");
-          status.textContent = done + "일 저장 완료, " + failed.length + "일 실패(" + failed.join(", ") + ")";
-        }
-        return;
-      }
-      var iso = toSave[i];
+    // Same pattern as the single-day popup: apply everything on screen right
+    // away, hand the rows to the save queue, and close. The queue sends them
+    // one by one in the background and retries any that fail.
+    toSave.forEach(function (iso) {
       var d = bulkDraft[iso];
-      status.textContent = "저장 중… (" + (i + 1) + "/" + toSave.length + ")";
       var payload = {
         weight: d.weight,
         calories: d.calories,
@@ -1247,34 +1361,27 @@
         period: !!(state.entries[iso] && state.entries[iso].period),
         existingPhotoFileId: (state.entries[iso] && state.entries[iso].photoFileId) || ""
       };
-      saveEntryToSheet(iso, payload).then(function (res) {
-        state.entries[iso] = {
-          weight: d.weight,
-          calories: d.calories,
-          condition: d.condition,
-          note: d.note,
-          exercised: d.exercised,
-          exerciseCalories: payload.exerciseCalories,
-          cheatDay: d.cheatDay,
-          drinking: d.drinking,
-          waist1: d.waist1,
-          waist2: d.waist2,
-          steps: d.steps,
-          period: payload.period,
-          photo: (state.entries[iso] && state.entries[iso].photo) || "",
-          photoFileId: (res && res.photoFileId) || (state.entries[iso] && state.entries[iso].photoFileId) || ""
-        };
-        // So a second "전체 저장" click (without reopening this table)
-        // doesn't needlessly resend this row again.
-        bulkOriginal[iso] = defaultBulkDraft(state.entries[iso]);
-        done++;
-        saveNext(i + 1);
-      }).catch(function () {
-        failed.push(iso.slice(5));
-        saveNext(i + 1);
-      });
-    }
-    saveNext(0);
+      state.entries[iso] = {
+        weight: d.weight,
+        calories: d.calories,
+        condition: d.condition.slice(),
+        note: d.note,
+        exercised: d.exercised,
+        exerciseCalories: payload.exerciseCalories,
+        cheatDay: d.cheatDay,
+        drinking: d.drinking,
+        waist1: d.waist1,
+        waist2: d.waist2,
+        steps: d.steps,
+        period: payload.period,
+        photo: (state.entries[iso] && state.entries[iso].photo) || "",
+        photoFileId: payload.existingPhotoFileId
+      };
+      enqueueSave(iso, payload);
+    });
+    showToast(toSave.length + "일 저장 중 — 완료되면 DAILY LOG 옆 점이 초록색으로 바뀌어요");
+    closeBulkModal();
+    renderCalendar();
   }
 
   // ---- month-as-image export ---------------------------------------------
@@ -1782,16 +1889,7 @@
       period: newValue,
       existingPhotoFileId: existing.photoFileId || ""
     };
-    setSaveStatus("saving");
-    saveEntryToSheet(iso, payload).then(function (res) {
-      if (state.entries[iso]) {
-        state.entries[iso].photoFileId = (res && res.photoFileId) || state.entries[iso].photoFileId || "";
-      }
-      setSaveStatus("success");
-    }).catch(function () {
-      setSaveStatus("error");
-      showToast(iso + " 저장 실패 — 인터넷 연결을 확인해주세요");
-    });
+    enqueueSave(iso, payload);
   }
 
   document.getElementById("periodBtn").addEventListener("click", function () {
@@ -1831,12 +1929,27 @@
   renderWeekdayRow();
   renderCalendar(); // show instantly — cached data if we have it, otherwise an empty grid
 
+  // Anything left unsent from last time (app closed mid-upload, no signal)
+  // gets sent now.
+  if (outboxSize() > 0) processOutbox();
+
   // Refresh from Google Sheets in the background. The calendar is already
   // interactive by this point, so this no longer blocks anything.
   // null means the load failed — keep the cached calendar on screen and
   // leave the cache untouched instead of wiping both with an empty result.
+  var loadStartedAt = Date.now();
   loadAllEntries().then(function (entries) {
     if (entries === null) return;
+    // Days still waiting in the save queue, or edited while this load was
+    // running, keep their on-screen version — the sheet doesn't have the
+    // change yet, so taking the sheet's copy would undo it.
+    Object.keys(localEditedAt).concat(Object.keys(outbox)).forEach(function (iso) {
+      var pending = !!outbox[iso];
+      var editedDuringLoad = (localEditedAt[iso] || 0) >= loadStartedAt;
+      if (!pending && !editedDuringLoad) return;
+      if (state.entries[iso]) entries[iso] = state.entries[iso];
+      else delete entries[iso];
+    });
     state.entries = entries;
     renderCalendar();
     saveCachedEntries(entries);
