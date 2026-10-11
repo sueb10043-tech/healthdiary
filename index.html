@@ -134,6 +134,10 @@
   .photo-check-btn.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; }
   .cal-cell.no-photo-flag { background-color: #DCDFD3 !important; }
   .cal-cell.period-flag { background-color: #FBEBF0; }
+  /* Waist view: days with a waist measurement turn green (declared after
+     period-flag so it wins on days that are both). */
+  .cal-cell.waist-flag { background-color: #DCEBC9; }
+  .cal-cell.waist-flag .stat-txt { color: #3F5A22; font-weight: 600; }
 
   .bulk-overlay { position: fixed; inset: 0; background: rgba(20,28,20,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 55; }
   .bulk-modal { background: #FDFCF8; border-radius: 16px; padding: 20px; width: 100%; max-width: 720px; max-height: 92vh; display: flex; flex-direction: column; animation: popIn 0.16s ease-out; }
@@ -217,10 +221,10 @@
     /* table-layout:fixed divides columns equally by default — give the
        short "치팅"/"음주" columns just enough room, and hand the rest to
        the wider date/number columns that actually need it. */
-    .weekly-table th:nth-child(1), .weekly-table td:nth-child(1) { width: 19%; }
-    .weekly-table th:nth-child(2), .weekly-table td:nth-child(2) { width: 20%; }
-    .weekly-table th:nth-child(3), .weekly-table td:nth-child(3) { width: 22%; }
-    .weekly-table th:nth-child(4), .weekly-table td:nth-child(4) { width: 20%; }
+    .weekly-table th:nth-child(1), .weekly-table td:nth-child(1) { width: 23%; }
+    .weekly-table th:nth-child(2), .weekly-table td:nth-child(2) { width: 19%; }
+    .weekly-table th:nth-child(3), .weekly-table td:nth-child(3) { width: 20%; }
+    .weekly-table th:nth-child(4), .weekly-table td:nth-child(4) { width: 19%; }
     .weekly-table th:nth-child(5), .weekly-table td:nth-child(5) { width: 9.5%; }
     .weekly-table th:nth-child(6), .weekly-table td:nth-child(6) { width: 9.5%; }
     .weekly-table th, .weekly-table td { padding: 7px 1px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
@@ -308,6 +312,7 @@
       <span class="item"><span class="dot cheat"></span>치팅</span>
       <span class="item"><span class="dot drink"></span>음주</span>
       <div style="display:flex; gap:6px; margin-left:auto;">
+        <button type="button" id="waistBtn" class="photo-check-btn" aria-label="허리 치수 보기" title="허리 치수 보기">📏</button>
         <button type="button" id="periodBtn" class="photo-check-btn" aria-label="생리 기간 설정" title="생리 기간 설정">🌸</button>
         <button type="button" id="photoCheckBtn" class="photo-check-btn" aria-label="사진 확인 모드" title="사진 확인 모드">📷</button>
       </div>
@@ -346,6 +351,11 @@
   // When on, days with no saved photo get a gray background so they're
   // easy to spot at a glance without opening each one.
   var photoCheckMode = false;
+
+  // When on, days with a waist measurement turn green and show 허리1/허리2
+  // in place of weight/calories. Can't be on together with photo check mode
+  // (gray vs green would clash) — turning one on turns the other off.
+  var waistViewMode = false;
 
   // When on, tapping a calendar day toggles its 생리 (period) flag directly
   // instead of opening the day's edit popup.
@@ -791,10 +801,20 @@
       if (weekdayIdx === 6) classes.push("sat");
       if (photoCheckMode && !(entry && entry.photo)) classes.push("no-photo-flag");
       if (entry && entry.period) classes.push("period-flag");
+      var hasWaist = !!(entry && (entry.waist1 || entry.waist2));
+      if (waistViewMode && hasWaist) classes.push("waist-flag");
       var condEmojis = sortConditionValues(toConditionArray(entry && entry.condition)).map(conditionEmoji).filter(Boolean);
-      var weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
-      var caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
-      var condTxt = condEmojis.length ? condEmojis.join("\u2009") : "";
+      var weightTxt, caloriesTxt, condTxt;
+      if (waistViewMode) {
+        // Row 1 = \ud5c8\ub9ac \uce58\uc2181, row 2 = \ud5c8\ub9ac \uce58\uc2182; condition row left empty.
+        weightTxt = (entry && entry.waist1) ? escapeHtml(entry.waist1) + "cm" : "";
+        caloriesTxt = (entry && entry.waist2) ? escapeHtml(entry.waist2) + "cm" : "";
+        condTxt = "";
+      } else {
+        weightTxt = (entry && entry.weight) ? escapeHtml(entry.weight) + "kg" : "";
+        caloriesTxt = (entry && entry.calories) ? escapeHtml(entry.calories) + "kcal" : "";
+        condTxt = condEmojis.length ? condEmojis.join("\u2009") : "";
+      }
       var leftIcons = (entry && entry.exercised)
         ? '<span class="icon-group exercise-emoji">' + EXERCISE_EMOJI + "</span>"
         : "<span></span>";
@@ -1586,8 +1606,9 @@
     return (d.getMonth() + 1) + "/" + pad2(d.getDate()) + "(" + WEEKDAYS[d.getDay()] + ")";
   }
 
+  // Mobile label: "10/4" rather than "10/04" — saves a character per date.
   function fmtWeekDateShort(d) {
-    return (d.getMonth() + 1) + "/" + pad2(d.getDate());
+    return (d.getMonth() + 1) + "/" + d.getDate();
   }
 
   function average(nums) {
@@ -1862,6 +1883,20 @@
   document.getElementById("photoCheckBtn").addEventListener("click", function () {
     photoCheckMode = !photoCheckMode;
     this.classList.toggle("active", photoCheckMode);
+    if (photoCheckMode && waistViewMode) {
+      waistViewMode = false;
+      document.getElementById("waistBtn").classList.remove("active");
+    }
+    renderCalendar();
+  });
+
+  document.getElementById("waistBtn").addEventListener("click", function () {
+    waistViewMode = !waistViewMode;
+    this.classList.toggle("active", waistViewMode);
+    if (waistViewMode && photoCheckMode) {
+      photoCheckMode = false;
+      document.getElementById("photoCheckBtn").classList.remove("active");
+    }
     renderCalendar();
   });
 
