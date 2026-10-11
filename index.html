@@ -183,6 +183,27 @@
   .month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
   .month-grid-btn { padding: 11px 0; border: 1px solid #D7DED2; border-radius: 8px; background: #fff; font-size: 13px; font-family: 'Work Sans', sans-serif; cursor: pointer; color: #20302B; }
   .month-grid-btn.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; font-weight: 600; }
+
+  /* Bottom row under the legend: 일괄 입력 pinned to the right. */
+  .bottom-action-row { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+  /* Graph popup */
+  .graph-modal { max-width: 640px; }
+  .graph-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .graph-toggle-group, .graph-range-group { display: flex; gap: 6px; }
+  .graph-chip { border: 1px solid #D7DED2; background: #fff; border-radius: 20px; padding: 6px 12px; font-size: 12.5px; color: #20302B; display: inline-flex; align-items: center; gap: 6px; }
+  .graph-chip.active { border: 1.5px solid #7E8F3F; background: #EEF1E4; font-weight: 600; }
+  .graph-chip .key { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+  .graph-range-group .graph-chip { padding: 5px 10px; font-size: 11.5px; }
+  .graph-canvas-wrap { position: relative; height: 320px; }
+  .graph-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: #5B6B63; margin-top: 10px; }
+  .graph-legend .item { display: inline-flex; align-items: center; gap: 6px; }
+  .graph-legend .key { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+  .graph-note { font-size: 11px; color: #8A9689; margin-top: 6px; }
+  @media (max-width: 480px) {
+    .graph-canvas-wrap { height: 280px; }
+    .graph-chip { padding: 6px 10px; font-size: 12px; }
+  }
   /* On wider (PC) screens, scale the whole calendar up — the aspect-ratio
      on each cell keeps them square, so this just makes everything bigger,
      not distorted. */
@@ -217,16 +238,12 @@
     .weekly-table .wk-full { display: none; }
     .weekly-table .wk-short { display: inline; }
     .weekly-table .th-unit { display: none; }
-    .weekly-table { width: 100%; font-size: 10.5px; table-layout: fixed; }
-    /* table-layout:fixed divides columns equally by default — give the
-       short "치팅"/"음주" columns just enough room, and hand the rest to
-       the wider date/number columns that actually need it. */
-    .weekly-table th:nth-child(1), .weekly-table td:nth-child(1) { width: 23%; }
-    .weekly-table th:nth-child(2), .weekly-table td:nth-child(2) { width: 19%; }
-    .weekly-table th:nth-child(3), .weekly-table td:nth-child(3) { width: 20%; }
-    .weekly-table th:nth-child(4), .weekly-table td:nth-child(4) { width: 19%; }
-    .weekly-table th:nth-child(5), .weekly-table td:nth-child(5) { width: 9.5%; }
-    .weekly-table th:nth-child(6), .weekly-table td:nth-child(6) { width: 9.5%; }
+    /* Short headers on mobile: "체중 / 칼로리 / 걸음" (no "평균", no "수"). */
+    .weekly-table .th-avg { display: none; }
+    .weekly-table .th-su { display: none; }
+    /* Column widths on mobile are set from MOBILE_WEEKLY_COL_WIDTHS in the
+       script (inline, so nothing here can override them). */
+    .weekly-table { font-size: 10.5px; }
     .weekly-table th, .weekly-table td { padding: 7px 1px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
     .weekly-modal .bulk-head .title { font-size: 16px; }
 
@@ -292,7 +309,7 @@
       <div style="display:flex; gap:8px;">
         <button id="weeklyAvgBtn" class="bulk-open-btn">📅 주간 평균</button>
         <button id="exportImageBtn" class="bulk-open-btn">📊 표로 저장</button>
-        <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
+        <button id="graphBtn" class="bulk-open-btn">📈 그래프</button>
       </div>
     </div>
 
@@ -317,11 +334,16 @@
         <button type="button" id="photoCheckBtn" class="photo-check-btn" aria-label="사진 확인 모드" title="사진 확인 모드">📷</button>
       </div>
     </div>
+
+    <div class="bottom-action-row">
+      <button id="openBulkBtn" class="bulk-open-btn">📋 일괄 입력</button>
+    </div>
   </div>
 
   <div id="modalRoot"></div>
   <div id="bulkModalRoot"></div>
   <div id="weeklyModalRoot"></div>
+  <div id="graphModalRoot"></div>
   <div id="lightboxRoot"></div>
   <div id="toastRoot"></div>
 
@@ -336,6 +358,13 @@
     { value: "allergy", label: "알러지", emoji: "\uD83E\uDD22" }
   ];
   var WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  // ★ 모바일 주간 평균 표의 칸 너비 (단위 px) — 이 숫자만 바꾸면 그대로 고정돼요.
+  //   순서: [주, 체중 평균, 칼로리 평균, 걸음수 평균, 치팅, 음주]
+  //   표 전체 폭 = 여섯 숫자의 합. 화면보다 크면 표를 좌우로 밀어서 볼 수 있어요.
+  //   (참고: 일반적인 폰 화면에서 팝업 안쪽 폭은 약 290~320px)
+  var MOBILE_WEEKLY_COL_WIDTHS = [74, 60, 64, 60, 30, 30];
+  var MOBILE_MAX_WIDTH = 480; // 이 폭(px) 이하일 때 위 너비를 적용
+
   var EXERCISE_EMOJI = "💪"; // shown next to the date number on days marked as exercised
   // Paste the Web App URL you get after deploying the Apps Script (Code.gs)
   // as a Web App. Looks like: https://script.google.com/macros/s/AKfycb.../exec
@@ -1648,7 +1677,8 @@
       rows.push({
         weekKey: isoOf(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()),
         label: fmtWeekDate(weekStart) + " ~ " + fmtWeekDate(weekEnd),
-        labelShort: fmtWeekDateShort(weekStart) + "~" + fmtWeekDateShort(weekEnd),
+        // Mobile: end date is always just the day — "10/5~11", "9/28~4".
+        labelShort: fmtWeekDateShort(weekStart) + "~" + weekEnd.getDate(),
         weightAvg: average(weights),
         caloriesAvg: average(calories),
         stepsAvg: average(steps),
@@ -1722,10 +1752,22 @@
       body.innerHTML = '<div class="weekly-empty-note">표시할 주가 없어요.</div>';
       return;
     }
-    var html = '<table class="weekly-table"><thead><tr>' +
+    // On mobile, pin every column to the exact px width from
+    // MOBILE_WEEKLY_COL_WIDTHS via <colgroup> + inline styles, so CSS can't
+    // redistribute them.
+    var isMobile = window.matchMedia && window.matchMedia("(max-width: " + MOBILE_MAX_WIDTH + "px)").matches;
+    var tableOpen = '<table class="weekly-table">';
+    if (isMobile) {
+      var totalW = MOBILE_WEEKLY_COL_WIDTHS.reduce(function (a, b) { return a + b; }, 0);
+      tableOpen = '<table class="weekly-table" style="table-layout:fixed;width:' + totalW + 'px;min-width:' + totalW + 'px;">' +
+        "<colgroup>" + MOBILE_WEEKLY_COL_WIDTHS.map(function (w) {
+          return '<col style="width:' + w + 'px;">';
+        }).join("") + "</colgroup>";
+    }
+    var html = tableOpen + '<thead><tr>' +
       '<th>주</th><th>체중<span class="th-avg"> 평균</span><span class="th-unit">(kg)</span></th>' +
       '<th>칼로리<span class="th-avg"> 평균</span><span class="th-unit">(kcal)</span></th>' +
-      '<th>걸음수<span class="th-avg"> 평균</span><span class="th-unit">(보)</span></th>' +
+      '<th>걸음<span class="th-su">수</span><span class="th-avg"> 평균</span><span class="th-unit">(보)</span></th>' +
       '<th>치팅</th><th>음주</th>' +
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
@@ -1877,6 +1919,328 @@
   function closeWeeklyModal() {
     document.getElementById("weeklyModalRoot").innerHTML = "";
   }
+
+  // ---- trend graph -----------------------------------------------------------
+  // Two toggles (체중, 허리 치수) — 허리 치수 draws two lines (허리1, 허리2).
+  // When both are on, weight uses the left axis (kg) and waist the right (cm).
+  var GRAPH_COLORS = { weight: "#5E7A2E", waist1: "#2E6FA8", waist2: "#C2562E" };
+  var graphState = { weight: true, waist: false, range: "all" };
+
+  function graphRangeStartIso(range) {
+    if (range === "all") return null;
+    var d = new Date();
+    d.setMonth(d.getMonth() - (range === "1m" ? 1 : 3));
+    return isoOf(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function numOrNull(v) {
+    var n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  }
+
+  function buildGraphData() {
+    var startLimit = graphRangeStartIso(graphState.range);
+    var todayIso = todayStr();
+    var dates = Object.keys(state.entries).filter(function (iso) {
+      var e = state.entries[iso];
+      if (!e) return false;
+      if (startLimit && iso < startLimit) return false;
+      if (iso > todayIso) return false;
+      var hasW = graphState.weight && numOrNull(e.weight) !== null;
+      var hasWaist = graphState.waist && (numOrNull(e.waist1) !== null || numOrNull(e.waist2) !== null);
+      return hasW || hasWaist;
+    }).sort();
+    if (dates.length === 0) return null;
+
+    // One label per calendar day from first to last data point, so the
+    // x-axis spacing reflects real time (gaps between waist measurements
+    // look as long as they actually were).
+    var labels = [], isoList = [];
+    var cur = new Date(dates[0] + "T00:00:00");
+    var end = new Date(dates[dates.length - 1] + "T00:00:00");
+    while (cur <= end) {
+      var iso = isoOf(cur.getFullYear(), cur.getMonth(), cur.getDate());
+      isoList.push(iso);
+      labels.push((cur.getMonth() + 1) + "/" + cur.getDate());
+      cur.setDate(cur.getDate() + 1);
+    }
+    function series(field) {
+      return isoList.map(function (iso) {
+        var e = state.entries[iso];
+        return e ? numOrNull(e[field]) : null;
+      });
+    }
+    return { labels: labels, isoList: isoList, weight: series("weight"), waist1: series("waist1"), waist2: series("waist2") };
+  }
+
+  // Rounds an axis range out to tidy tick values (e.g. 56.0–58.5 by 0.5).
+  function niceAxis(min, max, targetTicks) {
+    if (min === max) { min -= 1; max += 1; }
+    var pad = (max - min) * 0.08;
+    min -= pad; max += pad;
+    var raw = (max - min) / targetTicks;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var steps = [1, 2, 2.5, 5, 10];
+    var step = mag;
+    for (var i = 0; i < steps.length; i++) { if (steps[i] * mag >= raw) { step = steps[i] * mag; break; } }
+    var lo = Math.floor(min / step) * step;
+    var hi = Math.ceil(max / step) * step;
+    var ticks = [];
+    for (var v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 100) / 100);
+    return { min: lo, max: hi, ticks: ticks };
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+    return el;
+  }
+
+  // Drawn by hand as SVG (no chart library), so it works offline and loads
+  // instantly like the rest of the app.
+  function renderGraph() {
+    var wrap = document.getElementById("graphCanvasWrap");
+    var legend = document.getElementById("graphLegend");
+    var note = document.getElementById("graphNote");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    legend.innerHTML = "";
+    note.textContent = "";
+
+    if (!graphState.weight && !graphState.waist) {
+      wrap.innerHTML = '<div class="weekly-empty-note">보고 싶은 항목을 선택해주세요.</div>';
+      return;
+    }
+    var data = buildGraphData();
+    if (!data) {
+      wrap.innerHTML = '<div class="weekly-empty-note">이 기간에 기록이 없어요.</div>';
+      return;
+    }
+
+    var both = graphState.weight && graphState.waist;
+    var series = [];
+    if (graphState.weight) series.push({ key: "weight", label: "체중", unit: "kg", axis: "kg", values: data.weight, color: GRAPH_COLORS.weight });
+    if (graphState.waist) {
+      series.push({ key: "waist1", label: "허리1", unit: "cm", axis: "cm", values: data.waist1, color: GRAPH_COLORS.waist1 });
+      series.push({ key: "waist2", label: "허리2", unit: "cm", axis: "cm", values: data.waist2, color: GRAPH_COLORS.waist2 });
+    }
+
+    var W = wrap.clientWidth || 320;
+    var H = wrap.clientHeight || 280;
+    var m = { top: 12, right: both ? 44 : 12, bottom: 26, left: 44 };
+    var plotW = W - m.left - m.right;
+    var plotH = H - m.top - m.bottom;
+    var n = data.labels.length;
+    function xAt(i) { return m.left + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW); }
+
+    // One y-scale per unit.
+    var axes = {};
+    ["kg", "cm"].forEach(function (unit) {
+      var vals = [];
+      series.forEach(function (sr) { if (sr.axis === unit) sr.values.forEach(function (v) { if (v !== null) vals.push(v); }); });
+      if (!vals.length) return;
+      var a = niceAxis(Math.min.apply(null, vals), Math.max.apply(null, vals), 5);
+      a.y = function (v) { return m.top + plotH - ((v - a.min) / (a.max - a.min)) * plotH; };
+      axes[unit] = a;
+    });
+    var leftAxis = graphState.weight ? "kg" : "cm";
+    var rightAxis = both ? "cm" : null;
+
+    var svg = svgEl("svg", { width: W, height: H, viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "체중·허리 치수 변화 그래프" });
+    svg.style.display = "block";
+    svg.style.touchAction = "pan-y";
+
+    // Grid + axis labels (left axis gets the gridlines).
+    var la = axes[leftAxis];
+    la.ticks.forEach(function (t) {
+      var y = la.y(t);
+      svg.appendChild(svgEl("line", { x1: m.left, x2: m.left + plotW, y1: y, y2: y, stroke: "#E7EBE3", "stroke-width": 1 }));
+      var tx = svgEl("text", { x: m.left - 6, y: y + 3.5, "text-anchor": "end", "font-size": 10.5, fill: "#6B7A70" });
+      tx.textContent = t + leftAxis;
+      svg.appendChild(tx);
+    });
+    if (rightAxis) {
+      var ra = axes[rightAxis];
+      ra.ticks.forEach(function (t) {
+        var tx = svgEl("text", { x: m.left + plotW + 6, y: ra.y(t) + 3.5, "text-anchor": "start", "font-size": 10.5, fill: "#6B7A70" });
+        tx.textContent = t + rightAxis;
+        svg.appendChild(tx);
+      });
+    }
+
+    // X labels: about 5, evenly spaced.
+    var xTickCount = Math.min(5, n);
+    for (var k = 0; k < xTickCount; k++) {
+      var idx = xTickCount === 1 ? 0 : Math.round((k / (xTickCount - 1)) * (n - 1));
+      var anchor = k === 0 ? "start" : (k === xTickCount - 1 ? "end" : "middle");
+      var xl = svgEl("text", { x: xAt(idx), y: H - 8, "text-anchor": anchor, "font-size": 10.5, fill: "#6B7A70" });
+      xl.textContent = data.labels[idx];
+      svg.appendChild(xl);
+    }
+
+    // Lines (gaps are bridged) + dots. Waist is measured occasionally, so
+    // every measurement gets a visible dot; weight only gets dots when the
+    // range is short enough for them not to clutter.
+    series.forEach(function (sr) {
+      var a = axes[sr.axis];
+      var pts = [];
+      sr.values.forEach(function (v, i) { if (v !== null) pts.push([xAt(i), a.y(v)]); });
+      if (pts.length > 1) {
+        svg.appendChild(svgEl("path", {
+          d: pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" "),
+          fill: "none", stroke: sr.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"
+        }));
+      }
+      var r = sr.axis === "cm" ? 4 : (n <= 60 ? 2.5 : 0);
+      if (r || pts.length === 1) {
+        pts.forEach(function (p) {
+          svg.appendChild(svgEl("circle", { cx: p[0], cy: p[1], r: r || 4, fill: sr.color, stroke: "#FDFCF8", "stroke-width": 1.5 }));
+        });
+      }
+    });
+
+    // Hover / touch: a hairline snaps to the nearest day that has a value,
+    // and one tooltip lists every selected series for that day.
+    var hair = svgEl("line", { x1: 0, x2: 0, y1: m.top, y2: m.top + plotH, stroke: "#8A9689", "stroke-width": 1, visibility: "hidden" });
+    svg.appendChild(hair);
+    var hit = svgEl("rect", { x: m.left, y: m.top, width: plotW, height: plotH, fill: "transparent" });
+    svg.appendChild(hit);
+    wrap.appendChild(svg);
+
+    var tip = document.createElement("div");
+    tip.style.cssText = "position:absolute;pointer-events:none;background:#20302B;color:#fff;border-radius:6px;padding:6px 8px;font-size:11.5px;line-height:1.5;visibility:hidden;white-space:nowrap;z-index:2;";
+    wrap.appendChild(tip);
+
+    var hasAny = [];
+    for (var i = 0; i < n; i++) {
+      hasAny.push(series.some(function (sr) { return sr.values[i] !== null; }));
+    }
+    function showAt(clientX) {
+      var rect = svg.getBoundingClientRect();
+      var x = clientX - rect.left;
+      var rawIdx = n === 1 ? 0 : Math.round(((x - m.left) / plotW) * (n - 1));
+      rawIdx = Math.max(0, Math.min(n - 1, rawIdx));
+      var best = -1;
+      for (var d = 0; d < n; d++) {
+        if (rawIdx - d >= 0 && hasAny[rawIdx - d]) { best = rawIdx - d; break; }
+        if (rawIdx + d < n && hasAny[rawIdx + d]) { best = rawIdx + d; break; }
+      }
+      if (best < 0) return;
+      var hx = xAt(best);
+      hair.setAttribute("x1", hx); hair.setAttribute("x2", hx);
+      hair.setAttribute("visibility", "visible");
+
+      tip.textContent = "";
+      var dt = new Date(data.isoList[best] + "T00:00:00");
+      var title = document.createElement("div");
+      title.style.cssText = "color:#C9D0C7;font-size:10.5px;";
+      title.textContent = (dt.getMonth() + 1) + "/" + dt.getDate() + " (" + WEEKDAYS[dt.getDay()] + ")";
+      tip.appendChild(title);
+      series.forEach(function (sr) {
+        var v = sr.values[best];
+        if (v === null) return;
+        var row = document.createElement("div");
+        var key = document.createElement("span");
+        key.style.cssText = "display:inline-block;width:12px;height:2px;margin-right:6px;vertical-align:middle;background:" + sr.color;
+        var val = document.createElement("b");
+        val.textContent = v + sr.unit;
+        var lab = document.createElement("span");
+        lab.style.cssText = "color:#C9D0C7;margin-left:5px;";
+        lab.textContent = sr.label;
+        row.appendChild(key); row.appendChild(val); row.appendChild(lab);
+        tip.appendChild(row);
+      });
+      tip.style.visibility = "visible";
+      var tw = tip.offsetWidth;
+      var left = hx + 10;
+      if (left + tw > W) left = hx - tw - 10;
+      tip.style.left = Math.max(0, left) + "px";
+      tip.style.top = m.top + "px";
+    }
+    function hide() {
+      hair.setAttribute("visibility", "hidden");
+      tip.style.visibility = "hidden";
+    }
+    hit.addEventListener("pointermove", function (e) { showAt(e.clientX); });
+    hit.addEventListener("pointerdown", function (e) { showAt(e.clientX); });
+    hit.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") hide(); });
+
+    legend.innerHTML = series.map(function (sr) {
+      var axisTxt = both ? (sr.axis === "kg" ? " (왼쪽 kg)" : " (오른쪽 cm)") : "";
+      return '<span class="item"><span class="key" style="background:' + sr.color + '"></span>' + sr.label + axisTxt + "</span>";
+    }).join("");
+    if (both) note.textContent = "체중과 허리는 단위가 달라 세로축이 따로예요. 선 기울기끼리 비교하기보다 각각 오르내림을 보세요.";
+  }
+
+  function onGraphResize() {
+    if (document.getElementById("graphCanvasWrap")) renderGraph();
+  }
+
+  function openGraphModal() {
+    var root = document.getElementById("graphModalRoot");
+    root.innerHTML =
+      '<div class="bulk-overlay" id="graphOverlay">' +
+        '<div class="bulk-modal graph-modal">' +
+          '<div class="bulk-head">' +
+            '<div class="title">그래프</div>' +
+            '<button class="bulk-close-btn" id="graphCloseBtn">✕</button>' +
+          '</div>' +
+          '<div class="graph-controls">' +
+            '<div class="graph-toggle-group">' +
+              '<button type="button" class="graph-chip" data-toggle="weight"><span class="key" style="background:' + GRAPH_COLORS.weight + '"></span>체중</button>' +
+              '<button type="button" class="graph-chip" data-toggle="waist"><span class="key" style="background:' + GRAPH_COLORS.waist1 + '"></span>허리 치수</button>' +
+            '</div>' +
+            '<div class="graph-range-group">' +
+              '<button type="button" class="graph-chip" data-range="1m">1개월</button>' +
+              '<button type="button" class="graph-chip" data-range="3m">3개월</button>' +
+              '<button type="button" class="graph-chip" data-range="all">전체</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="graph-canvas-wrap" id="graphCanvasWrap"></div>' +
+          '<div class="graph-legend" id="graphLegend"></div>' +
+          '<div class="graph-note" id="graphNote"></div>' +
+        '</div>' +
+      '</div>';
+
+    function syncChips() {
+      Array.prototype.forEach.call(root.querySelectorAll("[data-toggle]"), function (b) {
+        b.classList.toggle("active", !!graphState[b.getAttribute("data-toggle")]);
+      });
+      Array.prototype.forEach.call(root.querySelectorAll("[data-range]"), function (b) {
+        b.classList.toggle("active", b.getAttribute("data-range") === graphState.range);
+      });
+    }
+    Array.prototype.forEach.call(root.querySelectorAll("[data-toggle]"), function (b) {
+      b.addEventListener("click", function () {
+        var key = b.getAttribute("data-toggle");
+        graphState[key] = !graphState[key];
+        syncChips();
+        renderGraph();
+      });
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-range]"), function (b) {
+      b.addEventListener("click", function () {
+        graphState.range = b.getAttribute("data-range");
+        syncChips();
+        renderGraph();
+      });
+    });
+    document.getElementById("graphOverlay").addEventListener("click", function (e) {
+      if (e.target.id === "graphOverlay") closeGraphModal();
+    });
+    document.getElementById("graphCloseBtn").addEventListener("click", closeGraphModal);
+
+    window.addEventListener("resize", onGraphResize);
+    syncChips();
+    renderGraph();
+  }
+
+  function closeGraphModal() {
+    window.removeEventListener("resize", onGraphResize);
+    document.getElementById("graphModalRoot").innerHTML = "";
+  }
+
+  document.getElementById("graphBtn").addEventListener("click", openGraphModal);
 
   document.getElementById("weeklyAvgBtn").addEventListener("click", openWeeklyModal);
 
