@@ -1137,8 +1137,13 @@
       var waist2 = document.getElementById("waist2Input").value.trim();
       var steps = document.getElementById("stepsInput").value.trim();
 
-      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note && !draft.exercised && !waist1 && !waist2 && !steps) {
-        showToast("사진이나 컨디션 중 하나는 기록해 주세요");
+      // Only blocks a completely empty save. Any single item is enough —
+      // including just 치팅 or 음주 (e.g. marking a planned cheat day ahead
+      // of time), or a day that's only marked as a period day.
+      var isPeriodDay = !!(state.entries[iso] && state.entries[iso].period);
+      if (!draft.photo && draft.condition.length === 0 && !weight && !calories && !note &&
+          !draft.exercised && !draft.cheatDay && !draft.drinking && !waist1 && !waist2 && !steps && !isPeriodDay) {
+        showToast("입력한 내용이 없어요");
         return;
       }
 
